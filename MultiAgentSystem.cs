@@ -8,16 +8,23 @@ public class MultiAgentSystem : MonoBehaviour
     // Agent Properties
     public GameObject Agent;
     float velocity = 1.0f;
+    float minDistance = 1.0f;      ///// Minimum Distance between Agents: 1.0 = r*2 of a unit Agent
 
 
     // Seed Properties
     public GameObject seed;
     static Vector3 SeedPosition = new Vector3(50, 0, 50);
+    Seed SeedInstance;
+
+    // Leader Properties
+    public GameObject leader;
+    Vector3 leaderStartPosition = new Vector3(50, 0, 50);
+    Leader LeaderInstance;
 
 
     // Environment Properties
     float AreaWidth = 100f;
-    static int NumAgents = 100;
+    static int NumAgents = 20;
 
 
     // Lists/Collections
@@ -37,11 +44,13 @@ public class MultiAgentSystem : MonoBehaviour
 
 
 
+
     // Start is called before the first frame update
     void Start()
     {
         PlaceAgents();
-        new Seed(seed, SeedPosition, blueGlowMaterial);
+        //SeedInstance = new Seed(seed, SeedPosition, blueGlowMaterial);
+        LeaderInstance = new Leader(leader, leaderStartPosition, blueGlowMaterial);
     }
 
 
@@ -50,9 +59,46 @@ public class MultiAgentSystem : MonoBehaviour
     {
         //MoveAgentsRandomly();
         //MoveAgentsNoCollisions();
-        DiffusionLimitedAggregation();
+        //DiffusionLimitedAggregation();
 
+        //LeaderInstance.RandomWalk(movingAgents, velocity, minDistance, 0, AreaWidth);
+        LeaderInstance.EvadeClosestAgent(movingAgents, velocity, minDistance, 0, AreaWidth);
+        FollowTheLeader();
     }
+
+
+
+
+
+
+
+
+
+
+    ////////////////////////   FOLLOW THE LEADER  ////////////////////////
+
+    //FollowTheLeader: Agents move torwards the Leader
+    public void FollowTheLeader()
+    {                      
+        for (int i = 0; i < listAgents.Count; i++)
+        {
+            Vector3 agentPosition = listAgents[i].transform.position;
+            Vector3 pursueLeader = (LeaderInstance.Position - agentPosition).normalized * velocity * 0.1f; // CORRECT LEADER POSITION
+
+            if (!OutsideBoundaries(agentPosition + pursueLeader, 0, AreaWidth) &&
+                !Collides(minDistance, agentPosition, agentPosition + pursueLeader, listAgents.Select(a => a.transform.position).ToList()))
+            {
+                listAgents[i].GetComponent<Renderer>().material = whiteGlowMaterial;
+                listAgents[i].transform.Translate(pursueLeader);
+            }
+            else 
+            {
+                listAgents[i].GetComponent<Renderer>().material = redGlowMaterial;
+            }
+        }
+    }
+
+
 
 
 
@@ -65,7 +111,6 @@ public class MultiAgentSystem : MonoBehaviour
     {
         int i = -1;                   ///// i -> counter
         int tries = 10000;            ///// tries -> loop failsafe
-        float minDistance = 1.0f;     ///// 1.0 = r*2 of a unit Agent
 
         while (i++ < listAgents.Count - 1 && tries-- > 0)
         {
@@ -133,6 +178,8 @@ public class MultiAgentSystem : MonoBehaviour
 
 
 
+
+
     ////////////////////////////   AGENT MOUVEMENT  ////////////////////////////
 
     // MoveAgentsRandomly: moves the agents randomly in space with no regards for their surroundings
@@ -151,7 +198,6 @@ public class MultiAgentSystem : MonoBehaviour
     {
         int i = -1;                   ///// i -> counter
         int tries = 10000;            ///// tries -> loop failsafe
-        float minDistance = 1.0f;     ///// 1.0 = r*2 of a unit Agent
 
         while (i++ < listAgents.Count - 1 && tries-- > 0)
         {
@@ -190,7 +236,7 @@ public class MultiAgentSystem : MonoBehaviour
 
 
     // OutsideBoundaries: Checks if a given vector is located outside of the given boundaries (square)
-    bool OutsideBoundaries(Vector3 position, float min, float max)
+    public bool OutsideBoundaries(Vector3 position, float min, float max)
     {
         if (position.x > max ||
             position.z > max ||
@@ -214,7 +260,7 @@ public class MultiAgentSystem : MonoBehaviour
 
 
     // Random Direction Vector in Cartesian coordinates: 4 possible directions (+x, -x, +z, -z)
-    Vector3 RandomVectorXZ(float velocity)
+    public Vector3 RandomVectorXZ(float velocity)
     {
         Vector3 vector;
         int random = Random.Range(0, 4);
@@ -265,7 +311,6 @@ public class MultiAgentSystem : MonoBehaviour
     public List<Vector3> AgentStartPositions()
     {
         int tries = 10000;            ///// tries -> loop failsafe
-        float minDistance = 1.0f;     ///// 1.0 = r*2 of a unit Agent
 
         while (movingAgents.Count < NumAgents && tries-- > 0)
         {
@@ -281,7 +326,7 @@ public class MultiAgentSystem : MonoBehaviour
     // Random Position (= Vector), with the X and Z coordinates placed randomly between the interval of 0 and AreaWidth
     Vector3 RandomPosition()
     {
-        return new Vector3(Random.Range(0.0f, AreaWidth), 0, Random.Range(0.0f, AreaWidth));
+        return new Vector3(Random.Range(0, AreaWidth), 0, Random.Range(0, AreaWidth));
     }
 
 
