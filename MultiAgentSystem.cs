@@ -3,17 +3,21 @@ using System.Collections.Generic;
 using UnityEngine;
 using System.Linq;
 
-public class MultiAgentSystem : MonoBehaviour
-{
-    // Agent Properties
-    public GameObject Agent;
-    float velocity = 1.0f;
-    float minDistance = 1.0f;      ///// Minimum Distance between Agents: 1.0 = r*2 of a unit Agent
 
+public class MultiAgentSystem : MonoBehaviour 
+{
+    CommonMethods CM = new CommonMethods();
+
+    // Agent Properties
+    public GameObject agent;
+    Agents agents;
+    float velocity = 1.0f;
+    float acceleration = 0.0f;
+    float minDistance = 1.0f;       // Minimum Distance between Agents: 1.0 = r*2 of a unit Agent
 
     // Seed Properties
     public GameObject seed;
-    static Vector3 SeedPosition = new Vector3(50, 0, 50);
+    static Vector3 SeedPosition = new Vector3(10, 0, 20);
     Seed SeedInstance;
 
     // Leader Properties
@@ -23,16 +27,22 @@ public class MultiAgentSystem : MonoBehaviour
 
 
     // Environment Properties
-    float AreaWidth = 100f;
-    static int NumAgents = 20;
+    SpatialSubdivision Subdivision = new SpatialSubdivision(0, AreaWidth, division);
+    static float AreaWidth = 100f;
+    static int division = 10;             // Grid Subdivision: in how many cells is the grid divided into?
+    float AreaInfluence = 5f;             // Area of Influence of each agent: how far do they "see"
+    static int NumAgents = 100;
+
 
 
     // Lists/Collections
     List<GameObject> listAgents = new List<GameObject>(NumAgents);
-    Dictionary<int[,], GameObject> dictionaryAgents = new Dictionary<int[,], GameObject>();
+    Dictionary<Vector2Int, List<GameObject>> dictionaryAgents = new Dictionary<Vector2Int, List<GameObject>>(NumAgents);
 
-    List<Vector3> movingAgents = new List<Vector3>(NumAgents);
+    static List<Vector3> agentStartPositions = new List<Vector3>(NumAgents);
+    //List<Vector3> agentPositions = agentStartPositions.ConvertAll(p => new Vector3(p.x, p.y, p.z));   // I don't think I need this one (delete?)
     List<Vector3> staticAgents = new List<Vector3>(NumAgents + 1) { SeedPosition };
+
 
 
     // Render Effects
@@ -43,32 +53,115 @@ public class MultiAgentSystem : MonoBehaviour
 
 
 
+    // Animation Properties
+    float timer = 0;
+
+
+    
 
 
     // Start is called before the first frame update
     void Start()
     {
-        PlaceAgents();
+        // Instantiate Agents
+        agents = new Agents(agent, whiteGlowMaterial, NumAgents);
+        agents.PlaceAgents(0, AreaWidth, minDistance);
+
+        agentStartPositions = agents.agentStartPositions;
+        listAgents = agents.listAgents;
+        
+
+        // Instantiate the Seed
         //SeedInstance = new Seed(seed, SeedPosition, blueGlowMaterial);
-        LeaderInstance = new Leader(leader, leaderStartPosition, blueGlowMaterial);
+
+        // Instantiate the Leader
+        //LeaderInstance = new Leader(leader, leaderStartPosition, blueGlowMaterial);
     }
 
 
     // Update is called once per frame
     void FixedUpdate()
     {
-        //MoveAgentsRandomly();
-        //MoveAgentsNoCollisions();
-        //DiffusionLimitedAggregation();
+        //RandomWalk();
+        //RandomWalkNoCollisions();
 
-        //LeaderInstance.RandomWalk(movingAgents, velocity, minDistance, 0, AreaWidth);
-        LeaderInstance.EvadeClosestAgent(movingAgents, velocity, minDistance, 0, AreaWidth);
-        FollowTheLeader();
+
+        // Needs a Seed:
+        //DiffusionLimitedAggregation();
+        //Queue();
+        //Communication();
+
+
+        // Needs a Leader
+        //LeaderInstance.RandomWalk(listAgents.Select(a => a.transform.position).ToList(), velocity, minDistance, 0, AreaWidth);
+        //LeaderInstance.EvadeClosestAgent(listAgents.Select(a => a.transform.position).ToList(), velocity, minDistance, 0, AreaWidth);
+        //LeaderInstance.RandomEvade(listAgents.Select(a => a.transform.position).ToList(), velocity, minDistance, 0, AreaWidth);
+        //FollowTheLeader();
+        //AvoidTheLeader();
+
+
+        // Animation Sequence (with timer)
+        //timer += Time.deltaTime;
+        //if (timer < 5)
+        //{
+        //    RandomWalkNoCollisions();
+        //}
+        //Invoke("Reset", 5);   // Time in seconds
     }
 
 
 
 
+
+
+
+    ////////////////////////   COMMUNICATION  ////////////////////////
+
+    //Communication: Agents simulate communication using colors
+    public void Communication()
+    {
+        float areaOfInfluence = 15f;
+
+        for (int i = 0; i < listAgents.Count; i++)
+        {
+            if (listAgents[i].tag == "Moving")
+            {
+                Vector3 newDirection = CM.RandomVector(velocity);
+                Vector3 agentPosition = listAgents[i].transform.position;
+                Vector3 newPosition = agentPosition + newDirection;
+
+                if (CM.Collides(areaOfInfluence, agentPosition, agentPosition, staticAgents))
+                {
+                    listAgents[i].GetComponent<Renderer>().material = blueGlowMaterial;
+                    listAgents[i].tag = "Transmitting";
+                    staticAgents.Add(agentPosition);
+                }
+                else
+                if (!CM.Collides(minDistance, agentPosition, newPosition, listAgents.Select(a => a.transform.position).ToList()) &&
+                    !CM.OutsideBoundaries(newPosition, 0, AreaWidth))
+                {
+                    listAgents[i].GetComponent<Renderer>().material = whiteGlowMaterial;
+                    listAgents[i].transform.Translate(newDirection);
+                }
+
+            }
+            else if (listAgents[i].tag == "Transmitting")
+            {
+                StartCoroutine(Blink(listAgents[i]));
+            }
+        }
+    }
+
+
+    // Blink
+    IEnumerator Blink(GameObject agent)
+    {
+        if (agent.GetComponent<Renderer>().material = blueGlowMaterial)
+            agent.GetComponent<Renderer>().material = redGlowMaterial;
+        else
+            agent.GetComponent<Renderer>().material = blueGlowMaterial;
+        yield return new WaitForSeconds(5f);
+    }
 
 
 
@@ -83,21 +176,54 @@ public class MultiAgentSystem : MonoBehaviour
         for (int i = 0; i < listAgents.Count; i++)
         {
             Vector3 agentPosition = listAgents[i].transform.position;
-            Vector3 pursueLeader = (LeaderInstance.Position - agentPosition).normalized * velocity * 0.1f; // CORRECT LEADER POSITION
+            Vector3 pursueLeader = (LeaderInstance.Position - agentPosition).normalized * velocity * 0.1f;
+            Vector3 newPosition = agentPosition + pursueLeader;
 
-            if (!OutsideBoundaries(agentPosition + pursueLeader, 0, AreaWidth) &&
-                !Collides(minDistance, agentPosition, agentPosition + pursueLeader, listAgents.Select(a => a.transform.position).ToList()))
+            if (!CM.OutsideBoundaries(newPosition, 0, AreaWidth) &&
+                !CM.Collides(minDistance * 2, agentPosition, newPosition, listAgents.Select(a => a.transform.position).ToList()))
             {
                 listAgents[i].GetComponent<Renderer>().material = whiteGlowMaterial;
                 listAgents[i].transform.Translate(pursueLeader);
-            }
-            else 
-            {
-                listAgents[i].GetComponent<Renderer>().material = redGlowMaterial;
+                //agentPositions[i] = newPosition;
             }
         }
     }
 
+
+    //AvoidTheLeader: Agents run away from the Leader
+    public void AvoidTheLeader()
+    {
+        float areaInfluence = 15.0f;
+
+        for (int i = 0; i < listAgents.Count; i++)
+        {
+            Vector3 agentPosition = listAgents[i].transform.position;
+            Vector3 randomDirection = CM.RandomVector(velocity);
+            Vector3 newRandomPosition = agentPosition + randomDirection;
+            Vector3 avoidLeader = (agentPosition - LeaderInstance.Position).normalized * velocity;
+            Vector3 awayFromLeader = agentPosition + avoidLeader;
+
+            if (CM.Collides(areaInfluence, agentPosition, newRandomPosition, new List<Vector3>() { LeaderInstance.Position }))
+            {
+                listAgents[i].GetComponent<Renderer>().material = redGlowMaterial;
+                listAgents[i].transform.Translate(avoidLeader);
+                //agentPositions[i] = awayFromLeader;
+            }
+            if (!CM.OutsideBoundaries(newRandomPosition, 0, AreaWidth) &&
+                !CM.Collides(minDistance, agentPosition, newRandomPosition, listAgents.Select(a => a.transform.position).ToList()))
+            {
+                listAgents[i].GetComponent<Renderer>().material = whiteGlowMaterial;
+                listAgents[i].transform.Translate(randomDirection);
+                //agentPositions[i] = newRandomPosition;
+            }
+            else
+            {
+                Vector3 back = CM.BackToBoundaries(agentPosition, velocity, 0, AreaWidth) + randomDirection;
+                listAgents[i].transform.Translate(back);
+                //agentPositions[i] = agentPosition + back;
+            }
+        }
+    }
 
 
 
@@ -109,29 +235,28 @@ public class MultiAgentSystem : MonoBehaviour
     // DiffusionLimitedAggregation: moves the agents randomly in space until they find the seed or the agents attached to it
     public void DiffusionLimitedAggregation()
     {
-        int i = -1;                   ///// i -> counter
-        int tries = 10000;            ///// tries -> loop failsafe
-
-        while (i++ < listAgents.Count - 1 && tries-- > 0)
+        for (int i = 0; i < listAgents.Count; i++)
         {
-            Vector3 newDirection = RandomVector(velocity);
+            Vector3 newDirection = CM.RandomVector(velocity);
             Vector3 agentPosition = listAgents[i].transform.position;
             Vector3 newPosition = agentPosition + newDirection;
 
             if (listAgents[i].tag == "Moving")  
             {
-                if (Collides(minDistance * 1.2f, agentPosition, agentPosition, staticAgents))    // 1.2f is cheating -> CORRECT THAT
+                if (CM.Collides(minDistance * 1.2f, agentPosition, agentPosition, staticAgents))    // 1.2f is cheating -> CORRECT THAT
                 {
-                    float distanceToClosestAgent = Mathf.Abs(minDistance * 1.2f - Vector3.Distance(agentPosition, ClosestAgent(agentPosition, staticAgents))) / 2;
-                    Vector3 moveCloserToStaticAgent = Vector3.MoveTowards(agentPosition, ClosestAgent(agentPosition, staticAgents), distanceToClosestAgent) - agentPosition;
+                    // Corrective Vector: to be corrected !!!!!!!!!!!!!!!!!!!!!!
+                    float distanceToClosestAgent = Mathf.Abs(minDistance * 1.2f - Vector3.Distance(agentPosition, CM.ClosestAgent(agentPosition, staticAgents))) / 2;
+                    Vector3 moveCloserToStaticAgent = Vector3.MoveTowards(agentPosition, CM.ClosestAgent(agentPosition, staticAgents), distanceToClosestAgent) - agentPosition;
                     listAgents[i].transform.Translate(moveCloserToStaticAgent);
+
                     listAgents[i].GetComponent<Renderer>().material = blueGlowMaterial;
                     listAgents[i].tag = "Static";
                     staticAgents.Add(agentPosition);
                 }
                 else
-                if (!Collides(minDistance, agentPosition, newPosition, listAgents.Select(a => a.transform.position).ToList()) &&  
-                    !OutsideBoundaries(newPosition, 0, AreaWidth))                   // (a => a.tag == "Moving" ? a.transform.position : agentPosition).ToList()) &&    This last agentPosition is WRONG ^ Is there a NULL Type for Vector3?
+                if (!CM.Collides(minDistance, agentPosition, newPosition, listAgents.Select(a => a.transform.position).ToList()) &&  
+                    !CM.OutsideBoundaries(newPosition, 0, AreaWidth))                   // (a => a.tag == "Moving" ? a.transform.position : agentPosition).ToList()) &&    This last agentPosition is WRONG ^ Is there a NULL Type for Vector3?
                 {
                     listAgents[i].GetComponent<Renderer>().material = whiteGlowMaterial;
                     listAgents[i].transform.Translate(newDirection);
@@ -145,33 +270,41 @@ public class MultiAgentSystem : MonoBehaviour
     }
 
 
-    // ClosestAgent: Calculates the closest agent between a given agent position and a list of agent positions
-    Vector3 ClosestAgent(Vector3 position, List<Vector3> listPositions)
-    {
-        Vector3 closestAgent = new Vector3();
-        List<float> distances = new List<float>();
 
-        foreach (var other in listPositions)
+    public void Queue()
+    {
+        for (int i = 0; i < listAgents.Count; i++) 
         {
-            if (position != other)
+            Vector3 newDirection = CM.RandomVector(velocity);
+            Vector3 agentPosition = listAgents[i].transform.position;
+            Vector3 newPosition = agentPosition + newDirection;
+
+            if (listAgents[i].tag == "Moving")
             {
-                float distance = Vector3.Distance(position, other);
-                distances.Add(distance);
-                if (distances.All(d => distance <= d)) 
-                    closestAgent = other;
+                if (CM.Collides(minDistance * 1.2f, agentPosition, agentPosition, staticAgents))    // 1.2f is cheating -> CORRECT THAT
+                {
+                    // Corrective Vector: to be corrected !!!!!!!!!!!!!!!!!!!!!!
+                    float distanceToClosestAgent = Mathf.Abs(minDistance * 1.2f - Vector3.Distance(agentPosition, CM.ClosestAgent(agentPosition, staticAgents))) / 2;
+                    Vector3 moveCloserToStaticAgent = Vector3.MoveTowards(agentPosition, CM.ClosestAgent(agentPosition, staticAgents), distanceToClosestAgent) - agentPosition;
+                    listAgents[i].transform.Translate(moveCloserToStaticAgent);
+
+                    listAgents[i].GetComponent<Renderer>().material = blueGlowMaterial;
+                    listAgents[i].tag = "Static";
+                    staticAgents[0] = agentPosition;
+                }
+                else
+                if (!CM.Collides(minDistance, agentPosition, newPosition, listAgents.Select(a => a.transform.position).ToList()) &&
+                    !CM.OutsideBoundaries(newPosition, 0, AreaWidth))                   // (a => a.tag == "Moving" ? a.transform.position : agentPosition).ToList()) &&    This last agentPosition is WRONG ^ Is there a NULL Type for Vector3?
+                {
+                    listAgents[i].GetComponent<Renderer>().material = whiteGlowMaterial;
+                    listAgents[i].transform.Translate(newDirection);
+                }
+                else
+                {
+                    listAgents[i].GetComponent<Renderer>().material = redGlowMaterial;
+                }
             }
         }
-        return closestAgent;
-    }
-
-
-    // AbsVector: Returns a vector whose elements are the absolute values of each of the specified vector's elements.
-    Vector3 AbsVector(Vector3 vector)
-    {
-        vector.x = Mathf.Abs(vector.x);
-        vector.y = Mathf.Abs(vector.y);
-        vector.z = Mathf.Abs(vector.z);
-        return vector;
     }
 
 
@@ -180,33 +313,63 @@ public class MultiAgentSystem : MonoBehaviour
 
 
 
-    ////////////////////////////   AGENT MOUVEMENT  ////////////////////////////
+    ////////////////////////   RESET  ////////////////////////
+
+    // Reset: moves the agents back to their Start Position 
+    public void Reset()
+    {   
+        for (int i = 0; i < listAgents.Count; i++)
+        {
+            if (listAgents[i].tag == "Moving")
+            {
+                Vector3 agentPosition = listAgents[i].transform.position;
+                Vector3 backToStart = (agentStartPositions[i] - agentPosition).normalized * velocity * 0.5f;
+                //Vector3 backToStart = Vector3.MoveTowards(agentPosition, agentStartPositions[i], velocity);
+                listAgents[i].transform.Translate(backToStart);
+
+                if (agentPosition == agentStartPositions[i] || Vector3.Distance(agentPosition, agentStartPositions[i]) <= 0.5)  // 0.5 = Tolerance
+                {
+                    listAgents[i].GetComponent<Renderer>().material = blueGlowMaterial;
+                    listAgents[i].tag = "Static";       // Deceleration instead of static?
+                }
+            }
+        }
+    }
+
+
+
+
+
+
+    ////////////////////////////   RANDOM WALK  ////////////////////////////
 
     // MoveAgentsRandomly: moves the agents randomly in space with no regards for their surroundings
-    public void MoveAgentsRandomly()
+    public void RandomWalk()
     {
         foreach (GameObject agent in listAgents)
         {
-            agent.transform.Translate(RandomVectorXZ(velocity));
+            Vector3 newDirection = CM.RandomVectorXZ(velocity);
+            Vector3 newPosition = agent.transform.position + newDirection;
+
+            if (!CM.OutsideBoundaries(newPosition, 0, AreaWidth))
+            {
+                agent.transform.Translate(newDirection);
+            }
         }
     }
 
 
     // MoveAgentsNoColisions: moves the agents randomly in space while trying to avoid intersecting other agents
-    // TRY: Spatial data structures (e.g. bin-lattice spatial subdivision) to reduce algorithmic complexity
-    public void MoveAgentsNoCollisions()
+    public void RandomWalkNoCollisions()
     {
-        int i = -1;                   ///// i -> counter
-        int tries = 10000;            ///// tries -> loop failsafe
-
-        while (i++ < listAgents.Count - 1 && tries-- > 0)
+        for (int i = 0; i < listAgents.Count; i++)
         {
-            Vector3 newDirection = RandomVector(velocity);
+            Vector3 newDirection = CM.RandomVector(velocity);
             Vector3 agentPosition = listAgents[i].transform.position;
             Vector3 newPosition = agentPosition + newDirection;
 
-            if (!Collides(minDistance, agentPosition, newPosition, listAgents.Select(a => a.transform.position).ToList()) &&
-                !OutsideBoundaries(newPosition, 0, AreaWidth))
+            if (!CM.Collides(minDistance, agentPosition, newPosition, listAgents.Select(a => a.transform.position).ToList()) &&
+                !CM.OutsideBoundaries(newPosition, 0, AreaWidth))
             {
                 listAgents[i].GetComponent<Renderer>().material = whiteGlowMaterial;
                 listAgents[i].transform.Translate(newDirection);
@@ -218,152 +381,35 @@ public class MultiAgentSystem : MonoBehaviour
         }
     }
 
+    // With Dictionary
+    //public void RandomWalkNoCollisions()
+    //{
+    //    foreach (var cell in dictionaryAgents.Keys.ToList())
+    //    {
+    //        foreach (GameObject agent in dictionaryAgents[cell].ToList())
+    //        {
+    //            Vector3 newDirection = CM.RandomVector(velocity);
+    //            Vector3 agentPosition = agent.transform.position;
+    //            Vector3 newPosition = agentPosition + newDirection;
 
-    // Collides: Checks if an agent is moving into another agent's space
-    bool Collides(float minDistance, Vector3 position, Vector3 newPosition, List<Vector3> listPositions)
-    {
-        foreach (var other in listPositions)
-        {
-            if (position != other)
-            {
-                var distance = Vector3.Distance(newPosition, other);
-                if (distance <= minDistance)
-                    return true;
-            }    
-        }
-        return false;
-    }
+    //            Vector2Int newCell = Subdivision.GridLocation(newPosition);
+    //            List<Vector2Int> neighbouringCells = Subdivision.ClosestCells(newPosition, newCell, AreaInfluence);
 
+    //            if (!Subdivision.CollidesD(minDistance, agentPosition, newPosition, neighbouringCells) &&
+    //                !CM.OutsideBoundaries(newPosition, 0, AreaWidth))
+    //            {
+    //                agent.GetComponent<Renderer>().material = whiteGlowMaterial;
+    //                agent.transform.Translate(newDirection);
 
-    // OutsideBoundaries: Checks if a given vector is located outside of the given boundaries (square)
-    public bool OutsideBoundaries(Vector3 position, float min, float max)
-    {
-        if (position.x > max ||
-            position.z > max ||
-            position.x < min ||
-            position.z < min)
-            return true;
-        else
-            return false;
-    }
-
-
-    // Random Direction Vector in Polar coordinates: infinite possible directions (0º -> 360º float)
-    Vector3 RandomVector(float velocity)
-    {
-        float pi = Mathf.PI;
-        float angle = Random.Range(-pi, pi);
-        Vector3 vector = new Vector3(velocity * Mathf.Cos(angle), 0, velocity * Mathf.Sin(angle));
-
-        return vector;
-    }
-
-
-    // Random Direction Vector in Cartesian coordinates: 4 possible directions (+x, -x, +z, -z)
-    public Vector3 RandomVectorXZ(float velocity)
-    {
-        Vector3 vector;
-        int random = Random.Range(0, 4);
-
-        switch (random)
-        {
-            case 0:
-                vector = new Vector3(velocity, 0, 0);
-                break;
-            case 1:
-                vector = new Vector3(-velocity, 0, 0);
-                break;
-            case 2:
-                vector = new Vector3(0, 0, velocity);
-                break;
-            default:
-                vector = new Vector3(0, 0, -velocity);
-                break;
-        }
-        return vector;
-    }
-
-
-
-
-
-
-
-
-
-    ////////////////////////////   INITIAL AGENT PLACEMENT  ////////////////////////////
-
-    // placeAgents: places the agents according to the AgentStartPositions list
-    public List<GameObject> PlaceAgents()
-    {
-        foreach (Vector3 position in AgentStartPositions())
-        {
-            GameObject placeAgent = Instantiate(Agent, position, Quaternion.identity);
-            placeAgent.GetComponent<Renderer>().material = whiteGlowMaterial;
-            placeAgent.tag = "Moving";
-            listAgents.Add(placeAgent);
-        }
-        return listAgents;
-    }
-
-
-    // Agent Start Positions: list of randomly created vectors (with no overlap/intersections) representing the starting positions of the agents
-    public List<Vector3> AgentStartPositions()
-    {
-        int tries = 10000;            ///// tries -> loop failsafe
-
-        while (movingAgents.Count < NumAgents && tries-- > 0)
-        {
-            Vector3 position = RandomPosition();
-            if (!movingAgents.Any(p => Vector3.Distance(p, position) < minDistance))
-                movingAgents.Add(position);
-
-        }
-        return movingAgents;
-    }
-
-
-    // Random Position (= Vector), with the X and Z coordinates placed randomly between the interval of 0 and AreaWidth
-    Vector3 RandomPosition()
-    {
-        return new Vector3(Random.Range(0, AreaWidth), 0, Random.Range(0, AreaWidth));
-    }
-
-
-
-
-
-
-
-    ////////////////////////////   SPATIAL SUBDIVISION  ////////////////////////////
-
-    int[,] AgentLocation()
-    {
-        int spatialDimension = (int) AreaWidth;
-        int[,] location = new int[spatialDimension, spatialDimension];
-
-        for (int i = 0; i < location.GetLength(0); i++)
-        {
-            for (int j = 0; j < location.GetLength(1); j++)
-            {
-                location[i, j] = location.GetLength(0) * i + j;
-            }
-        }
-        return location;
-    }
-}
-
-
-
-
-
-
-
-
-// Eventually: Organize everything into classes...
-public class Agents
-{
-   
-
+    //                if (cell != newCell)
+    //                    Subdivision.UpdateDictionary(cell, newCell, agent);
+    //            }
+    //            else
+    //            {
+    //                agent.GetComponent<Renderer>().material = redGlowMaterial;
+    //            }
+    //        }
+    //    }
+    //}
 }
 
