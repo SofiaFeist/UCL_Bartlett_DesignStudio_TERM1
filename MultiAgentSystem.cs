@@ -39,10 +39,11 @@ public class MultiAgentSystem : MonoBehaviour
     List<GameObject> listAgents = new List<GameObject>(NumAgents);
     Dictionary<Vector2Int, List<GameObject>> dictionaryAgents = new Dictionary<Vector2Int, List<GameObject>>(NumAgents);
 
-    static List<Vector3> agentStartPositions = new List<Vector3>(NumAgents);
+    static List<Vector3> randomStartPositions = new List<Vector3>(NumAgents);
     //List<Vector3> agentPositions = agentStartPositions.ConvertAll(p => new Vector3(p.x, p.y, p.z));   // I don't think I need this one (delete?)
     List<Vector3> staticAgents = new List<Vector3>(NumAgents + 1) { SeedPosition };
-
+    List<Vector3> steeringForces;
+    List<Vector3> imagePixels;
 
 
     // Render Effects
@@ -51,11 +52,13 @@ public class MultiAgentSystem : MonoBehaviour
     public Material yellowGlowMaterial;
     public Material blueGlowMaterial;
 
+    public Texture2D texture;
+
 
 
     // Animation Properties
     float timer = 0;
-
+    int t = 0;
 
     
 
@@ -63,44 +66,82 @@ public class MultiAgentSystem : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
-        // Instantiate Agents
-        agents = new Agents(agent, whiteGlowMaterial, NumAgents);
-        agents.PlaceAgents(0, AreaWidth, minDistance);
+        //imagePixels = PointsFromImage();
+        //NumAgents = imagePixels.Count;
 
-        agentStartPositions = agents.agentStartPositions;
+        // INSTANTIATE AGENTS
+        agents = new Agents(agent, whiteGlowMaterial, NumAgents);
+        //agents.PlaceAgentsRandomly(0, AreaWidth, minDistance);
+        //agents.PlaceAgentsInRows(new Vector3(AreaWidth, 0, 0), AreaWidth);
+        //agents.PlaceAgentsInRows(Vector3.zero, AreaWidth);
+
+        randomStartPositions = agents.randomStartPositions;
         listAgents = agents.listAgents;
+        steeringForces = CM.StartingSteeringDirections(listAgents.Count, velocity);
+
+
+
+        //foreach (var item in PointsFromImage())
+        //{
+        //    Instantiate(agent, item + new Vector3(-8, 0, 10), Quaternion.identity);
+        //}
+
+
+        // INSTANTIATE SEED
+        //SeedInstance = new Seed(seed, SeedPosition, blueGlowMaterial);
+        GameObject emitter = Instantiate(agent, SeedPosition, Quaternion.identity);
+        StartCoroutine(Blink(emitter));
         
 
-        // Instantiate the Seed
-        //SeedInstance = new Seed(seed, SeedPosition, blueGlowMaterial);
 
-        // Instantiate the Leader
-        //LeaderInstance = new Leader(leader, leaderStartPosition, blueGlowMaterial);
+        // INSTANTIATE LEADER
+        //LeaderInstance = new Leader(leader, leaderStartPosition, blueGlowMaterial, velocity);
     }
 
 
     // Update is called once per frame
     void FixedUpdate()
     {
+        // AGENT WALKING METHODS
         //RandomWalk();
         //RandomWalkNoCollisions();
+        //Wander();
+        //Marching();
 
 
-        // Needs a Seed:
+
+        // AGENT/SEED BEHAVIOURS
         //DiffusionLimitedAggregation();
         //Queue();
         //Communication();
 
 
-        // Needs a Leader
+
+        // LEADER WALKING METHODS
         //LeaderInstance.RandomWalk(listAgents.Select(a => a.transform.position).ToList(), velocity, minDistance, 0, AreaWidth);
         //LeaderInstance.EvadeClosestAgent(listAgents.Select(a => a.transform.position).ToList(), velocity, minDistance, 0, AreaWidth);
         //LeaderInstance.RandomEvade(listAgents.Select(a => a.transform.position).ToList(), velocity, minDistance, 0, AreaWidth);
+        //LeaderInstance.Wander(listAgents.Select(a => a.transform.position).ToList(), velocity, minDistance, 0, AreaWidth);
+
+        // AGENT/LEADER BEHAVIOURS
         //FollowTheLeader();
         //AvoidTheLeader();
 
 
-        // Animation Sequence (with timer)
+
+        // SELF ASSEMBLY ALGORITHM
+        //if (listAgents.Count > t)
+        //{
+        //    if (listAgents[t].tag == "Static")
+        //        t++;
+        //    else
+        //        StartCoroutine(SelfAssembly(listAgents[t], imagePixels[t]));
+        //}
+
+
+
+
+        // ANIMATION SEQUENCE (with Timer)
         //timer += Time.deltaTime;
         //if (timer < 5)
         //{
@@ -112,6 +153,44 @@ public class MultiAgentSystem : MonoBehaviour
 
 
 
+    IEnumerator SelfAssembly(GameObject Ag, Vector3 position)
+    {
+        Vector3 agentPosition = Ag.transform.position;
+        Vector3 seekDirection = (position - agentPosition).normalized * velocity;
+        Vector3 newPosition = agentPosition + seekDirection;
+
+        if (Vector3.Distance(agentPosition, position) <= minDistance)
+        {
+            Ag.transform.Translate(position - agentPosition);
+            Ag.GetComponent<Renderer>().material = blueGlowMaterial;
+            Ag.tag = "Static";
+        }
+        else
+        {
+            Ag.transform.Translate(seekDirection);
+        }
+
+        yield return null;
+    }
+
+
+    public List<Vector3> PointsFromImage()
+    {
+        List<Vector3> positions = new List<Vector3>();
+
+        for (int i = 0; i < texture.width; i+=2)
+        {
+            for (int j = 0; j < texture.height; j+=2)
+            {
+                Color color = texture.GetPixel(i, j);
+
+                if (color.r < 1)
+                    positions.Add(new Vector3(i, 0, j));
+
+            }
+        }
+        return positions;
+    }
 
 
 
@@ -147,20 +226,24 @@ public class MultiAgentSystem : MonoBehaviour
             }
             else if (listAgents[i].tag == "Transmitting")
             {
-                StartCoroutine(Blink(listAgents[i]));
+                //StartCoroutine(Blink(listAgents[i]));
             }
         }
     }
 
 
     // Blink
-    IEnumerator Blink(GameObject agent)
+    IEnumerator Blink(GameObject obj)
     {
-        if (agent.GetComponent<Renderer>().material = blueGlowMaterial)
-            agent.GetComponent<Renderer>().material = redGlowMaterial;
-        else
-            agent.GetComponent<Renderer>().material = blueGlowMaterial;
-        yield return new WaitForSeconds(5f);
+        while (true)
+        {
+            yield return new WaitForSeconds(2);
+
+            if (obj.GetComponent<Renderer>().material = whiteGlowMaterial)
+                obj.GetComponent<Renderer>().material = blueGlowMaterial;
+            else
+                obj.GetComponent<Renderer>().material = whiteGlowMaterial;
+        }
     }
 
 
@@ -176,15 +259,15 @@ public class MultiAgentSystem : MonoBehaviour
         for (int i = 0; i < listAgents.Count; i++)
         {
             Vector3 agentPosition = listAgents[i].transform.position;
-            Vector3 pursueLeader = (LeaderInstance.Position - agentPosition).normalized * velocity * 0.1f;
+            Vector3 pursueLeader = (LeaderInstance.Position - agentPosition).normalized * velocity * 0.8f;
             Vector3 newPosition = agentPosition + pursueLeader;
 
             if (!CM.OutsideBoundaries(newPosition, 0, AreaWidth) &&
+                !CM.Collides(minDistance * 2, agentPosition, newPosition, new List<Vector3> { LeaderInstance.Position }) &&
                 !CM.Collides(minDistance * 2, agentPosition, newPosition, listAgents.Select(a => a.transform.position).ToList()))
             {
                 listAgents[i].GetComponent<Renderer>().material = whiteGlowMaterial;
                 listAgents[i].transform.Translate(pursueLeader);
-                //agentPositions[i] = newPosition;
             }
         }
     }
@@ -207,20 +290,17 @@ public class MultiAgentSystem : MonoBehaviour
             {
                 listAgents[i].GetComponent<Renderer>().material = redGlowMaterial;
                 listAgents[i].transform.Translate(avoidLeader);
-                //agentPositions[i] = awayFromLeader;
             }
             if (!CM.OutsideBoundaries(newRandomPosition, 0, AreaWidth) &&
                 !CM.Collides(minDistance, agentPosition, newRandomPosition, listAgents.Select(a => a.transform.position).ToList()))
             {
                 listAgents[i].GetComponent<Renderer>().material = whiteGlowMaterial;
                 listAgents[i].transform.Translate(randomDirection);
-                //agentPositions[i] = newRandomPosition;
             }
             else
             {
-                Vector3 back = CM.BackToBoundaries(agentPosition, velocity, 0, AreaWidth) + randomDirection;
-                listAgents[i].transform.Translate(back);
-                //agentPositions[i] = agentPosition + back;
+                Vector3 correctiveVector = randomDirection * 0.2f + CM.BackToBoundaries(agentPosition, randomDirection, velocity, 0, AreaWidth) * 0.2f;
+                listAgents[i].transform.Translate(correctiveVector);
             }
         }
     }
@@ -323,20 +403,78 @@ public class MultiAgentSystem : MonoBehaviour
             if (listAgents[i].tag == "Moving")
             {
                 Vector3 agentPosition = listAgents[i].transform.position;
-                Vector3 backToStart = (agentStartPositions[i] - agentPosition).normalized * velocity * 0.5f;
-                //Vector3 backToStart = Vector3.MoveTowards(agentPosition, agentStartPositions[i], velocity);
+                Vector3 backToStart = (randomStartPositions[i] - agentPosition).normalized * velocity * 0.5f;
                 listAgents[i].transform.Translate(backToStart);
 
-                if (agentPosition == agentStartPositions[i] || Vector3.Distance(agentPosition, agentStartPositions[i]) <= 0.5)  // 0.5 = Tolerance
-                {
+                if (agentPosition == randomStartPositions[i] || Vector3.Distance(agentPosition, randomStartPositions[i]) <= 0.5)   // 0.5 = Tolerance (because velocity is constant,
+                {                                                                                                                // it's difficult to find the exact start position) -> USE DECELERATION 
                     listAgents[i].GetComponent<Renderer>().material = blueGlowMaterial;
-                    listAgents[i].tag = "Static";       // Deceleration instead of static?
+                    listAgents[i].tag = "Static";       // Deceleration instead of static
                 }
             }
         }
     }
 
 
+
+
+
+
+
+
+    ////////////////////////////   WANDERING BEHAVIOUR  ////////////////////////////
+
+    // Wander: 
+    public void Wander()
+    {
+        for (int i = 0; i < listAgents.Count; i++)
+        {
+            Vector3 agentPosition = listAgents[i].transform.position;
+            Vector3 newDirection = CM.ConstrainedRandomVector(steeringForces[i], velocity, Mathf.PI / 6);   
+            //Vector3 newDirection = CM.PerlinVector(steeringForces[i], agentPosition, velocity);
+            Vector3 newPosition = agentPosition + newDirection;
+
+            if (!CM.Collides(minDistance, agentPosition, newPosition, listAgents.Select(a => a.transform.position).ToList()) &&
+                !CM.OutsideBoundaries(newPosition, 0, AreaWidth))
+            {
+                listAgents[i].GetComponent<Renderer>().material = whiteGlowMaterial;
+                listAgents[i].transform.Translate(newDirection);
+                steeringForces[i] = newDirection;
+            }
+            else if (CM.OutsideBoundaries(newPosition, 0, AreaWidth))
+            {
+                Vector3 correctiveVector = newDirection * 0.2f + CM.BackToBoundaries(agentPosition, newDirection, velocity, 0, AreaWidth) * 0.8f;  // CORRECT BUT USE ACCELERATION FORCES!!!!
+                listAgents[i].transform.Translate(correctiveVector);
+                steeringForces[i] = correctiveVector;
+            }
+            else
+            {
+                Vector3 correctiveVector = CM.PerpendicularVector(newDirection, 1).normalized * velocity;
+                listAgents[i].transform.Translate(correctiveVector);
+                listAgents[i].GetComponent<Renderer>().material = redGlowMaterial;
+            }
+        }
+    }
+
+
+    // Marching
+    public void Marching()
+    {
+
+        for (int i = 0; i < listAgents.Count; i++)
+        {
+            float coordX = listAgents[i].transform.position.x;
+            float coordZ = listAgents[i].transform.position.z;
+
+            if (coordX < AreaWidth)
+            {
+                listAgents[i].transform.Translate(new Vector3(velocity, 0, 0));
+            }
+
+
+
+        }
+    }
 
 
 

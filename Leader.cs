@@ -9,15 +9,17 @@ public class Leader
 
     GameObject leader;
     public Vector3 Position;
+    Vector3 startingForce;
 
 
 
     // Constructor
-    public Leader(GameObject prefab, Vector3 position, Material material)
+    public Leader(GameObject prefab, Vector3 position, Material material, float velocity)
     {
         this.Position = position;
         leader = Object.Instantiate(prefab, Position, Quaternion.identity);
         leader.GetComponent<Renderer>().material = material;
+        startingForce = CM.RandomVector(velocity);
     }
 
 
@@ -39,7 +41,7 @@ public class Leader
         }
         else
         {
-            Vector3 back = CM.BackToBoundaries(leaderPosition, velocity, AreaMin, AreaMax) + randomDirection;
+            Vector3 back = randomDirection + CM.BackToBoundaries(leaderPosition, velocity, AreaMin, AreaMax);
             leader.transform.Translate(back);
             this.Position = leaderPosition + back;
         }
@@ -61,7 +63,7 @@ public class Leader
         }
         else 
         {
-            Vector3 back = CM.BackToBoundaries(leaderPosition, velocity, AreaMin, AreaMax) + awayFromClosestAgent;
+            Vector3 back = awayFromClosestAgent + CM.BackToBoundaries(leaderPosition, velocity, AreaMin, AreaMax);
             leader.transform.Translate(back);   
             this.Position = leaderPosition + back;
         }
@@ -91,9 +93,33 @@ public class Leader
         }
         else
         {
-            Vector3 back = CM.BackToBoundaries(leaderPosition, velocity, AreaMin, AreaMax) + randomDirection;
+            Vector3 back = randomDirection + CM.BackToBoundaries(leaderPosition, velocity, AreaMin, AreaMax);
             leader.transform.Translate(back);     
             this.Position = leaderPosition + back;
+        }
+    }
+
+
+    public void Wander(List<Vector3> listPositions, float velocity, float minDistance, float AreaMin, float AreaMax)
+    {
+        Vector3 leaderPosition = leader.transform.position;
+        Vector3 newDirection = CM.ConstrainedRandomVector(startingForce, velocity, Mathf.PI / 6);
+        //Vector3 newDirection = CM.PerlinVector(startingForce, leaderPosition, velocity);
+        Vector3 newPosition = leaderPosition + newDirection;
+
+        if (!CM.Collides(minDistance, leaderPosition, newPosition, listPositions) &&
+            !CM.OutsideBoundaries(newPosition, AreaMin, AreaMax))
+        {
+            leader.transform.Translate(newDirection);
+            this.Position = newPosition;
+            startingForce = newDirection;
+        }
+        else if (CM.OutsideBoundaries(newPosition, AreaMin, AreaMax))
+        {
+            Vector3 back = newDirection + CM.BackToBoundaries(leaderPosition, velocity, AreaMin, AreaMax);
+            leader.transform.Translate(back);
+            this.Position = leaderPosition + back;
+            startingForce = back;
         }
     }
 }
