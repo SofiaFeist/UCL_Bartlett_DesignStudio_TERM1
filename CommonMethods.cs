@@ -44,6 +44,27 @@ public class CommonMethods
         return false;
     }
 
+    public bool Collides(Dictionary<Vector2Int, List<GameObject>> dictionary, float minDistance, Vector3 position, Vector3 newPosition, List<Vector2Int> listCells)
+    {
+        foreach (var cell in listCells)
+        {
+            if (!dictionary.ContainsKey(cell)) continue;
+
+            foreach (GameObject agent in dictionary[cell])
+            {
+                Vector3 otherPosition = agent.transform.position;
+
+                if (position != otherPosition)
+                {
+                    var distance = Vector3.Distance(newPosition, otherPosition);
+                    if (distance <= minDistance)
+                        return true;
+                }
+            }
+        }
+        return false;
+    }
+
 
     // OutsideBoundaries: Checks if a given vector is located outside of the given boundaries (square)
     public bool OutsideBoundaries(Vector3 position, float min, float max)
@@ -82,10 +103,14 @@ public class CommonMethods
             return NegativeVec;
         else
             return PositiveVec;
-
     }
 
 
+    // AvoidObstacle: Corrective Vector perpendicular to the current trajectory in order avoid an incoming obstacle
+    public Vector3 AvoidObstacle(Vector3 steeringVector, float direction, float velocity)
+    {
+        return PerpendicularVector(steeringVector, direction).normalized * velocity;
+    }
 
 
 

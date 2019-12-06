@@ -23,52 +23,12 @@ public class SpatialSubdivision
     
     
     
-    //public bool CollidesD(float minDistance, Vector3 position, Vector3 newPosition, List<Vector2Int> listCells)
-    //{
-    //    foreach (var cell in listCells)
-    //    {
-    //        if (!dictionaryAgents.ContainsKey(cell)) continue;
-
-    //        foreach (GameObject agent in dictionaryAgents[cell])
-    //        {
-    //            Vector3 otherPosition = agent.transform.position;
-
-    //            if (position != otherPosition)
-    //            {
-    //                var distance = Vector3.Distance(newPosition, otherPosition);
-    //                if (distance <= minDistance)
-    //                    return true;
-    //            }
-    //        }
-    //    }
-    //    return false;
-    //}
+    
 
 
-    // placeAgents: places the agents according to the AgentStartPositions list
-    //public Dictionary<Vector2Int, List<GameObject>> PlaceAgents()
-    //{
-    //    foreach (Vector3 position in agents.AgentStartPositions(0, AreaWidth, minDistance))
-    //    {
-    //        Vector2Int cell = GridLocation(position);
-    //        GameObject placeAgent = Instantiate(agent, position, Quaternion.identity);
-    //        placeAgent.GetComponent<Renderer>().material = whiteGlowMaterial;
-    //        placeAgent.tag = "Moving";
-    //        listAgents.Add(placeAgent);          // Do I still need this list?
+   
 
-    //        if (dictionaryAgents.TryGetValue(cell, out List<GameObject> agentsInCell))
-    //        {
-    //            agentsInCell.Add(placeAgent);
-    //        }
-    //        else
-    //        {
-    //            agentsInCell = new List<GameObject>();
-    //            agentsInCell.Add(placeAgent);
-    //            dictionaryAgents.Add(cell, agentsInCell);
-    //        }
-    //    }
-    //    return dictionaryAgents;
-    //}
+
 
 
 
@@ -77,26 +37,21 @@ public class SpatialSubdivision
     // GridLocation: Finds the location in the grid of a given position 
     public Vector2Int GridLocation(Vector3 position)
     {
-        int x = 0;
-        int z = 0;
-        float coordX = position.x;
-        float coordZ = position.z;
+        int coordX;
+        int coordZ;
+        float subdivision = AreaMax / division;
 
-        int FindCell(int count, float coordinate)
-        {
-            if (coordinate >= AreaMax)
-                count = division - 1;
-            else
-            {
-                while (coordinate >= (AreaMax / division) * (count + 1))
-                {
-                    count++;
-                }
-            }
-            return count;
-        }
+        if(position.x >= AreaMax)
+            coordX = division - 1;
+        else
+            coordX = (int) Mathf.Floor(position.x / subdivision);
 
-        return new Vector2Int(FindCell(x, coordX), FindCell(z, coordZ));
+        if (position.z >= AreaMax)
+            coordZ = division - 1;
+        else
+            coordZ = (int) Mathf.Floor(position.z / subdivision);
+
+        return new Vector2Int(coordX, coordZ);
     }
 
 
@@ -138,20 +93,20 @@ public class SpatialSubdivision
 
 
     // UpdateDictionary: Updates dictionary cells as the agents move around
-    public void UpdateDictionary(Vector2Int currentCell, Vector2Int newCell, GameObject agent)
+    public void UpdateDictionary(Dictionary<Vector2Int, List<GameObject>> dictionary, Vector2Int currentCell, Vector2Int newCell, GameObject agent)
     {
-        if (dictionaryAgents.TryGetValue(newCell, out List<GameObject> agentsInCell))
+        if (dictionary.TryGetValue(newCell, out List<GameObject> agentsInCell))
         {
             agentsInCell.Add(agent);
-            dictionaryAgents[currentCell].Remove(agent);
-            if (!dictionaryAgents[currentCell].Any())
-                dictionaryAgents.Remove(currentCell);
+            dictionary[currentCell].Remove(agent);
+            if (!dictionary[currentCell].Any())
+                dictionary.Remove(currentCell);
         }
         else
         {
             agentsInCell = new List<GameObject>();
             agentsInCell.Add(agent);
-            dictionaryAgents.Add(newCell, agentsInCell);
+            dictionary.Add(newCell, agentsInCell);
         }
     }
 }
