@@ -39,17 +39,24 @@ public class SpatialSubdivision
     {
         int coordX;
         int coordZ;
-        float subdivision = AreaMax / division;
+        float subdivision = (AreaMax - AreaMin) / division;
+
 
         if(position.x >= AreaMax)
             coordX = division - 1;
+        else if (position.x <= AreaMin)
+            coordX = 0;
         else
             coordX = (int) Mathf.Floor(position.x / subdivision);
 
+
         if (position.z >= AreaMax)
             coordZ = division - 1;
+        else if (position.z <= AreaMin)
+            coordZ = 0;
         else
             coordZ = (int) Mathf.Floor(position.z / subdivision);
+
 
         return new Vector2Int(coordX, coordZ);
     }

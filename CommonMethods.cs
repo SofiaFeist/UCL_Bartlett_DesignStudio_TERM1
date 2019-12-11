@@ -9,15 +9,31 @@ public class CommonMethods
 
     ////////////////////////   AREA CHECKS  ////////////////////////
 
+    // ClosestPoint: Calculates the closest position between an agent and an outside list of positions
+    public Vector3 ClosestPosition(Vector3 position, List<Vector3> listPositions)
+    {
+        Vector3 closestPosition = new Vector3();
+        List<float> distances = new List<float>();
+
+        foreach (Vector3 p in listPositions)
+        {
+            float distance = Vector3.Distance(position, p);
+            distances.Add(distance);
+            if (distances.All(d => distance <= d))
+                closestPosition = p;
+        }
+        return closestPosition;
+    }
+
     // ClosestAgent: Calculates the closest agent between a given agent position and a list of agent positions
     public Vector3 ClosestAgent(Vector3 position, List<Vector3> listPositions)
     {
         Vector3 closestAgent = new Vector3();
         List<float> distances = new List<float>();
 
-        foreach (var other in listPositions)
+        foreach (Vector3 other in listPositions)
         {
-            if (position != other)
+            if (position != other)  // So that the agent doesn't compare against it's own position (assumes position can exist inside listPositions)
             {
                 float distance = Vector3.Distance(position, other);
                 distances.Add(distance);
@@ -29,8 +45,24 @@ public class CommonMethods
     }
 
 
-    // Collides: Checks if an agent is moving into another agent's space
-    public bool Collides(float minDistance, Vector3 position, Vector3 newPosition, List<Vector3> listPositions)
+    // Collides: Checks if an agent IS ALREADY in another agent's space
+    public bool Collides(float minDistance, Vector3 position, List<Vector3> listPositions)
+    {
+        foreach (var other in listPositions)
+        {
+            if (position != other)
+            {
+                var distance = Vector3.Distance(position, other);
+                if (distance <= minDistance)
+                    return true;
+            }
+        }
+        return false;
+    }
+
+
+    // Colliding: Checks if an agent IS MOVING into another agent's space
+    public bool Colliding(float minDistance, Vector3 position, Vector3 newPosition, List<Vector3> listPositions)
     {
         foreach (var other in listPositions)
         {
@@ -44,7 +76,9 @@ public class CommonMethods
         return false;
     }
 
-    public bool Collides(Dictionary<Vector2Int, List<GameObject>> dictionary, float minDistance, Vector3 position, Vector3 newPosition, List<Vector2Int> listCells)
+
+    // Colliding: Same but only works with the spatial subdivision (dictionary of positions and game objects)
+    public bool Colliding(Dictionary<Vector2Int, List<GameObject>> dictionary, float minDistance, Vector3 position, Vector3 newPosition, List<Vector2Int> listCells)
     {
         foreach (var cell in listCells)
         {
@@ -67,12 +101,12 @@ public class CommonMethods
 
 
     // OutsideBoundaries: Checks if a given vector is located outside of the given boundaries (square)
-    public bool OutsideBoundaries(Vector3 position, float min, float max)
+    public bool OutsideBoundaries(Vector3 position, float AreaMin, float AreaMax)
     {
-        if (position.x > max ||
-            position.z > max ||
-            position.x < min ||
-            position.z < min)
+        if (position.x > AreaMax ||
+            position.z > AreaMax ||
+            position.x < AreaMin ||
+            position.z < AreaMin)
             return true;
         else
             return false;
@@ -80,13 +114,13 @@ public class CommonMethods
 
 
     // BackToBoundaries: Corrective Vector that drives an agent back within the boundaries -> Perpendicular to Boundary
-    public Vector3 BackToBoundaries(Vector3 position, float velocity, float min, float max)
+    public Vector3 BackToBoundaries(Vector3 position, float velocity, float AreaMin, float AreaMax)
     {
-        if (position.x > max)
+        if (position.x > AreaMax)
             return new Vector3(-velocity, 0, 0);
-        else if (position.z > max)
+        else if (position.z > AreaMax)
             return new Vector3(0, 0, -velocity);
-        else if (position.x < min)
+        else if (position.x < AreaMin)
             return new Vector3(velocity, 0, 0);
         else
             return new Vector3(0, 0, velocity);
@@ -94,24 +128,41 @@ public class CommonMethods
 
 
     // BackToBoundaries: Corrective Vector that drives an agent back within the boundaries -> Perpendicular to Steering Vector
-    public Vector3 BackToBoundaries(Vector3 position, Vector3 steeringVector, float velocity, float min, float max) 
+    public Vector3 BackToBoundaries(Vector3 position, Vector3 steeringVector, float velocity, float AreaMin, float AreaMax) 
     {
         Vector3 PositiveVec = PerpendicularVector(steeringVector, 1).normalized * velocity;
         Vector3 NegativeVec = PerpendicularVector(steeringVector, -1).normalized * velocity;
 
-        if (OutsideBoundaries(position + PositiveVec, min, max))
+        if (OutsideBoundaries(position + PositiveVec, AreaMin, AreaMax))
             return NegativeVec;
         else
             return PositiveVec;
     }
 
 
-    // AvoidObstacle: Corrective Vector perpendicular to the current trajectory in order avoid an incoming obstacle
-    public Vector3 AvoidObstacle(Vector3 steeringVector, float direction, float velocity)
+    // AvoidObstacle: Corrective Vector perpendicular to the current trajectory in order avoid the closest obstacle
+    public Vector3 AvoidObstacle(Vector3 position, Vector3 closestObstacle, Vector3 steeringVector, float velocity)
     {
-        return PerpendicularVector(steeringVector, direction).normalized * velocity;
+        Vector3 PositiveVec = PerpendicularVector(steeringVector, 1).normalized * velocity;
+        Vector3 NegativeVec = PerpendicularVector(steeringVector, -1).normalized * velocity;
+
+        if (Vector3.Distance(position + PositiveVec, closestObstacle) < Vector3.Distance(position + NegativeVec, closestObstacle))
+            return NegativeVec;
+        else
+            return PositiveVec;
     }
 
+    
+    // OppositeForces: Checks if vectors are facing each other (with a range of 180º)
+    public bool OpposingForces(Vector3 currentTrajectory, Vector3 repellingForce)
+    {
+        float dotProduct = Vector3.Dot(currentTrajectory.normalized, repellingForce.normalized);
+
+        if (dotProduct < 0)
+            return true;
+        else
+            return false;
+    }
 
 
 
@@ -137,8 +188,8 @@ public class CommonMethods
     // PerpendicularVector: Returns a vector perpendicular to the given vector.
     public Vector3 PerpendicularVector(Vector3 vector, float direction)
     {
-        float coordX = 1.0f * direction;
-        float coordZ = -(coordX * vector.x) / vector.z;
+        float coordX = vector.z * (- direction);
+        float coordZ = vector.x * direction;
         return new Vector3(coordX, 0, coordZ);
     }
 
@@ -218,6 +269,13 @@ public class CommonMethods
                 break;
         }
         return vector;
+    }
+
+
+    // Random Position (= Vector), with the X and Z coordinates placed randomly between the given boundaries
+    public Vector3 RandomPosition(float AreaMin, float AreaMax)
+    {
+        return new Vector3(Random.Range(AreaMin, AreaMax), 0, Random.Range(AreaMin, AreaMax));
     }
 
 }

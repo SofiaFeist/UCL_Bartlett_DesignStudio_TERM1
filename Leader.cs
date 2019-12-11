@@ -34,7 +34,7 @@ public class Leader
         Vector3 newPosition = leaderPosition + randomDirection;
 
         if (!CM.OutsideBoundaries(newPosition, AreaMin, AreaMax) &&
-            !CM.Collides(minDistance, leaderPosition, newPosition, listPositions))
+            !CM.Colliding(minDistance, leaderPosition, newPosition, listPositions))
         {
             leader.transform.Translate(randomDirection);
             this.Position = newPosition;
@@ -52,11 +52,11 @@ public class Leader
     public void EvadeClosestAgent(List<Vector3> listPositions, float velocity, float minDistance, float AreaMin, float AreaMax)
     {
         Vector3 leaderPosition = leader.transform.position;
-        Vector3 ClosestAgentPosition = CM.ClosestAgent(leaderPosition, listPositions);
+        Vector3 ClosestAgentPosition = CM.ClosestPosition(leaderPosition, listPositions);
         Vector3 awayFromClosestAgent = (leaderPosition - ClosestAgentPosition).normalized * velocity;
 
         if (!CM.OutsideBoundaries(leader.transform.position, AreaMin, AreaMax) &&
-            !CM.Collides(minDistance, leaderPosition, awayFromClosestAgent, listPositions))
+            !CM.Colliding(minDistance, leaderPosition, awayFromClosestAgent, listPositions))
         {
             leader.transform.Translate(awayFromClosestAgent);
             this.Position = leaderPosition + awayFromClosestAgent;
@@ -70,23 +70,23 @@ public class Leader
     }
 
 
-    // RandomEvade: Hybrid Method between Random Walk and Evade closest agent -> Evades only when agents are within a certain proximity
+    // RandomEvade: Hybrid Method between Random Walk and Evade closest agent -> Evades only when agents are within a certain proximity (Better to avoid leader getting surrounded)
     public void RandomEvade(List<Vector3> listPositions, float velocity, float minDistance, float AreaMin, float AreaMax)
     {
         float areaInfluence = 5.0f;
         Vector3 leaderPosition = leader.transform.position;
         Vector3 randomDirection = CM.RandomVector(velocity);
         Vector3 newRandomPosition = leaderPosition + randomDirection;
-        Vector3 ClosestAgentPosition = CM.ClosestAgent(leaderPosition, listPositions);
+        Vector3 ClosestAgentPosition = CM.ClosestPosition(leaderPosition, listPositions);
         Vector3 awayFromClosestAgent = (leaderPosition - ClosestAgentPosition).normalized * velocity;
 
-        if (CM.Collides(areaInfluence, leaderPosition, newRandomPosition, listPositions))
+        if (CM.Colliding(areaInfluence, leaderPosition, newRandomPosition, listPositions))
         {
             leader.transform.Translate(awayFromClosestAgent);
             this.Position = leader.transform.position + awayFromClosestAgent;
         }
         else if (!CM.OutsideBoundaries(leader.transform.position, AreaMin, AreaMax) &&
-                 !CM.Collides(minDistance, leaderPosition, newRandomPosition, listPositions))
+                 !CM.Colliding(minDistance, leaderPosition, newRandomPosition, listPositions))
         {
             leader.transform.Translate(randomDirection);
             this.Position = leaderPosition + randomDirection;
@@ -100,6 +100,7 @@ public class Leader
     }
 
 
+    // Wander: Smooth form of random walk; small random displacements in the trajectory but no abrupt turns
     public void Wander(List<Vector3> listPositions, float velocity, float minDistance, float AreaMin, float AreaMax)
     {
         Vector3 leaderPosition = leader.transform.position;
@@ -107,7 +108,7 @@ public class Leader
         //Vector3 newDirection = CM.PerlinVector(startingForce, leaderPosition, velocity);
         Vector3 newPosition = leaderPosition + newDirection;
 
-        if (!CM.Collides(minDistance, leaderPosition, newPosition, listPositions) &&
+        if (!CM.Colliding(minDistance, leaderPosition, newPosition, listPositions) &&
             !CM.OutsideBoundaries(newPosition, AreaMin, AreaMax))
         {
             leader.transform.Translate(newDirection);
@@ -120,6 +121,14 @@ public class Leader
             leader.transform.Translate(back);
             this.Position = leaderPosition + back;
             startingForce = back;
+        }
+        else 
+        {
+            Vector3 colidingAgent = CM.ClosestAgent(leaderPosition, listPositions);
+            Vector3 awayFromAgent = leaderPosition - colidingAgent;
+
+            Vector3 correctiveVector = (newDirection + awayFromAgent).normalized * velocity;
+            leader.transform.Translate(correctiveVector);
         }
     }
 }

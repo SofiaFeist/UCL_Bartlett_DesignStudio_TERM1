@@ -6,7 +6,7 @@ using System.Linq;
 public class Agents
 {
     CommonMethods CM = new CommonMethods();
-    SpatialSubdivision Subdivision = new SpatialSubdivision(0, 100, 10);    // HARD CODED: FIX!
+    SpatialSubdivision Subdivision = new SpatialSubdivision(0, 100, 10);    // HARD CODED: FIX THIS!
 
     GameObject agent;
     Material material;
@@ -15,6 +15,7 @@ public class Agents
     public List<Vector3> randomStartPositions = new List<Vector3>();
     public List<GameObject> listAgents = new List<GameObject>();
     public Dictionary<Vector2Int, List<GameObject>> dictionaryAgents = new Dictionary<Vector2Int, List<GameObject>>();
+
 
 
     // Constructor
@@ -27,16 +28,50 @@ public class Agents
 
 
 
-    
-
 
 
 
 
     ////////////////////////////   INITIAL AGENT PLACEMENT METHODS  ////////////////////////////
 
-    //PlaceAgentsInRows: Place the agents in a regular grid
-    public List<GameObject> PlaceAgentsInRows(Vector3 position, float AreaMax)
+    // PlaceAgentsInRowsDictionary: places agents in a regular grid using a dictionary for spatial subdivision
+    public Dictionary<Vector2Int, List<GameObject>> PlaceAgentsInRowsDictionary(Vector3 placement)
+    {
+        int rows = (int)Mathf.Sqrt(NumberOfAgents) + 1;
+        int columns = (int)Mathf.Sqrt(NumberOfAgents);
+
+        for (int i = 0; i < rows; i++)
+        {
+            for (int j = 0; j < columns; j++)
+            {
+                if (listAgents.Count < NumberOfAgents)
+                {
+                    Vector3 position = new Vector3(i + i, 0, j + j) + placement;
+                    Vector2Int cell = Subdivision.GridLocation(position);
+                    GameObject placeAgent = Object.Instantiate(agent, position, Quaternion.identity);
+                    placeAgent.GetComponent<Renderer>().material = material;
+                    placeAgent.tag = "Moving";
+                    listAgents.Add(placeAgent);
+
+                    if (dictionaryAgents.TryGetValue(cell, out List<GameObject> agentsInCell))
+                    {
+                        agentsInCell.Add(placeAgent);
+                    }
+                    else
+                    {
+                        agentsInCell = new List<GameObject>();
+                        agentsInCell.Add(placeAgent);
+                        dictionaryAgents.Add(cell, agentsInCell);
+                    }
+                }
+            }
+        }
+        return dictionaryAgents;
+    }
+
+
+    // PlaceAgentsInRows: Place the agents in a regular grid
+    public List<GameObject> PlaceAgentsInRows(Vector3 placement)
     {
         int rows = (int) Mathf.Sqrt(NumberOfAgents) + 1;
         int columns = (int) Mathf.Sqrt(NumberOfAgents);
@@ -47,7 +82,7 @@ public class Agents
             {
                 if (listAgents.Count < NumberOfAgents)
                 {
-                    Vector3 _position = new Vector3(i + i, 0, j + j) + position;
+                    Vector3 _position = new Vector3(i + i, 0, j + j) + placement;
                     GameObject placeAgent = Object.Instantiate(agent, _position, Quaternion.identity);
                     placeAgent.GetComponent<Renderer>().material = material;
                     placeAgent.tag = "Moving";
@@ -59,8 +94,8 @@ public class Agents
     }
 
 
-    //PlaceAgentsDictionary: randomly places the agents using a dictionary for spatial subdivision
-    public Dictionary<Vector2Int, List<GameObject>> PlaceAgentsDictionary(float AreaMin, float AreaMax, float minDistance)
+    // PlaceAgentsDictionary: randomly places the agents using a dictionary for spatial subdivision
+    public Dictionary<Vector2Int, List<GameObject>> PlaceAgentsRandomlyDictionary(float AreaMin, float AreaMax, float minDistance)
     {
         foreach (Vector3 position in RandomStartPositions(AreaMin, AreaMax, minDistance))
         {
@@ -85,7 +120,7 @@ public class Agents
     }
 
 
-    //PlaceAgentsRandomly: places the agents according to the AgentStartPositions random list
+    // PlaceAgentsRandomly: places the agents according to the AgentStartPositions random list
     public List<GameObject> PlaceAgentsRandomly(float AreaMin, float AreaMax, float minDistance)
     {
         foreach (Vector3 position in RandomStartPositions(AreaMin, AreaMax, minDistance))
@@ -106,18 +141,10 @@ public class Agents
 
         while (randomStartPositions.Count < NumberOfAgents && tries-- > 0)
         {
-            Vector3 position = RandomPosition(AreaMin, AreaMax);
+            Vector3 position = CM.RandomPosition(AreaMin, AreaMax);
             if (!randomStartPositions.Any(p => Vector3.Distance(p, position) < minDistance))
                 randomStartPositions.Add(position);
         }
         return randomStartPositions;
     }
-
-
-    // Random Position (= Vector), with the X and Z coordinates placed randomly between the interval of 0 and AreaWidth
-    Vector3 RandomPosition(float AreaMin, float AreaMax)
-    {
-        return new Vector3(Random.Range(AreaMin, AreaMax), 0, Random.Range(AreaMin, AreaMax));
-    }
-
 }
