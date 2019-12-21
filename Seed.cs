@@ -1,10 +1,8 @@
-﻿using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
+﻿using UnityEngine;
 
 public class Seed 
 {
-    public Vector3 Position = new Vector3(0,0,0);
+    public Vector3 Position;
 
     public Seed(GameObject prefab, Vector3 position, Material material)
     {

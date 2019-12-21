@@ -1,15 +1,13 @@
-﻿using System.Collections;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 using System.Linq;
 
 public class CommonMethods 
 {
 
-
     ////////////////////////   AREA CHECKS  ////////////////////////
 
-    // ClosestPoint: Calculates the closest position between an agent and an outside list of positions
+    // ClosestPosition: Calculates the closest position between a given position and an outside list of positions
     public Vector3 ClosestPosition(Vector3 position, List<Vector3> listPositions)
     {
         Vector3 closestPosition = new Vector3();
@@ -25,7 +23,8 @@ public class CommonMethods
         return closestPosition;
     }
 
-    // ClosestAgent: Calculates the closest agent between a given agent position and a list of agent positions
+
+    // ClosestAgent: Calculates the closest agent between a given agent position and a list of agent positions (assumes position can exist inside listPositions)
     public Vector3 ClosestAgent(Vector3 position, List<Vector3> listPositions)
     {
         Vector3 closestAgent = new Vector3();
@@ -33,7 +32,7 @@ public class CommonMethods
 
         foreach (Vector3 other in listPositions)
         {
-            if (position != other)  // So that the agent doesn't compare against it's own position (assumes position can exist inside listPositions)
+            if (position != other)  // So that the agent doesn't compare against it's own position
             {
                 float distance = Vector3.Distance(position, other);
                 distances.Add(distance);
@@ -45,8 +44,8 @@ public class CommonMethods
     }
 
 
-    // Collides: Checks if an agent IS ALREADY in another agent's space
-    public bool Collides(float minDistance, Vector3 position, List<Vector3> listPositions)
+    // Colliding: Checks if an agent IS ALREADY in another agent's space
+    public bool Colliding(float minDistance, Vector3 position, List<Vector3> listPositions)
     {
         foreach (var other in listPositions)
         {
@@ -61,8 +60,8 @@ public class CommonMethods
     }
 
 
-    // Colliding: Checks if an agent IS MOVING into another agent's space
-    public bool Colliding(float minDistance, Vector3 position, Vector3 newPosition, List<Vector3> listPositions)
+    // WillCollide: Checks if an agent IS MOVING into another agent's space
+    public bool WillCollide(float minDistance, Vector3 position, Vector3 newPosition, List<Vector3> listPositions)
     {
         foreach (var other in listPositions)
         {
@@ -77,8 +76,8 @@ public class CommonMethods
     }
 
 
-    // Colliding: Same but only works with the spatial subdivision (dictionary of positions and game objects)
-    public bool Colliding(Dictionary<Vector2Int, List<GameObject>> dictionary, float minDistance, Vector3 position, Vector3 newPosition, List<Vector2Int> listCells)
+    // WillCollide: Same but only works with the spatial subdivision (dictionary of cell positions and game objects)
+    public bool WillCollide(Dictionary<Vector2Int, List<GameObject>> dictionary, float minDistance, Vector3 position, Vector3 newPosition, List<Vector2Int> listCells)
     {
         foreach (var cell in listCells)
         {
@@ -186,7 +185,7 @@ public class CommonMethods
 
 
     // PerpendicularVector: Returns a vector perpendicular to the given vector.
-    public Vector3 PerpendicularVector(Vector3 vector, float direction)
+    public Vector3 PerpendicularVector(Vector3 vector, float direction)     // direction: either 1 or -1.
     {
         float coordX = vector.z * (- direction);
         float coordZ = vector.x * direction;
@@ -194,7 +193,18 @@ public class CommonMethods
     }
 
 
-    // PerlinVector: Vector using Perlin Noise
+    // ConstrainedRandomVector: Random Vector constrained to a given amplitude (-amplitude -> +amplitude)
+    public Vector3 ConstrainedRandomVector(Vector3 steeringDirection, float velocity, float amplitude)
+    {
+        float angle = Mathf.Atan2(steeringDirection.z, steeringDirection.x);
+        float range = Random.Range(angle - amplitude, angle + amplitude);
+        Vector3 vector = new Vector3(Mathf.Cos(range), 0, Mathf.Sin(range));
+
+        return vector.normalized * velocity;
+    }
+
+
+    // PerlinVector: Random Vector using Perlin Noise
     public Vector3 PerlinVector(Vector3 steeringDirection, Vector3 position, float velocity)
     {
         float noise = Mathf.PerlinNoise(position.x, position.z);
@@ -206,19 +216,8 @@ public class CommonMethods
         else
             range = angle + noise * 0.5f;
 
-        Vector3 vector = new Vector3(velocity * Mathf.Cos(range), 0, velocity * Mathf.Sin(range));
-        return vector;
-    }
-
-
-    // ConstrainedRandomVector: Random Vector constrained to a given amplitude (-amplitude -> +amplitude)
-    public Vector3 ConstrainedRandomVector(Vector3 steeringDirection, float velocity, float amplitude)
-    {
-        float angle = Mathf.Atan2(steeringDirection.z, steeringDirection.x);
-        float range = Random.Range(angle - amplitude, angle + amplitude);
-        Vector3 vector = new Vector3(velocity * Mathf.Cos(range), 0, velocity * Mathf.Sin(range));
-
-        return vector;
+        Vector3 vector = new Vector3(Mathf.Cos(range), 0, Mathf.Sin(range));
+        return vector.normalized * velocity;
     }
 
 
@@ -236,18 +235,18 @@ public class CommonMethods
     }
 
 
-    // Random Direction Vector in Polar coordinates: infinite possible directions (0º -> 360º float)
+    // RandomVector: Random Direction Vector in Polar coordinates: infinite possible directions (0º -> 360º float)
     public Vector3 RandomVector(float velocity)
     {
         float pi = Mathf.PI;
         float angle = Random.Range(-pi, pi);
-        Vector3 vector = new Vector3(velocity * Mathf.Cos(angle), 0, velocity * Mathf.Sin(angle));
+        Vector3 vector = new Vector3(Mathf.Cos(angle), 0, Mathf.Sin(angle));
 
-        return vector;
+        return vector.normalized * velocity;
     }
 
 
-    // Random Direction Vector in Cartesian coordinates: 4 possible directions (+x, -x, +z, -z)
+    // RandomVectorXZ: Random Direction Vector in Cartesian coordinates: 4 possible directions (+x, -x, +z, -z)
     public Vector3 RandomVectorXZ(float velocity)
     {
         Vector3 vector;
@@ -272,10 +271,9 @@ public class CommonMethods
     }
 
 
-    // Random Position (= Vector), with the X and Z coordinates placed randomly between the given boundaries
+    // Random Position (= Vector), with the X and Z coordinates placed randomly within the given boundaries
     public Vector3 RandomPosition(float AreaMin, float AreaMax)
     {
         return new Vector3(Random.Range(AreaMin, AreaMax), 0, Random.Range(AreaMin, AreaMax));
     }
-
 }

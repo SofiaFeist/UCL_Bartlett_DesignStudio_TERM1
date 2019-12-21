@@ -1,5 +1,4 @@
-﻿using System.Collections;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 using System;
 using System.Linq;
@@ -8,13 +7,13 @@ public class SwarmOptimization
 {
     CommonMethods CM = new CommonMethods();
 
-    int NumberAgents;
-    float velocity;
 
     Vector3 direction;
-    float W = 0.5f;        // Inertia
-    float cAg = 0.8f;      // Acceleration Coefficients
-    float cSw = 0.9f;
+    float velocity;
+    
+    float omega = 0.5f;         // Inertia
+    float phiAgent = 0.8f;      // Acceleration Coefficients
+    float phiSwarm = 0.9f;
 
 
     float agentBest;
@@ -25,9 +24,9 @@ public class SwarmOptimization
     public Vector3 SwarmBestPosition;
 
 
-    public SwarmOptimization(List<Vector3> AgentStartPositions, int _NumberAgents, float AreaMin, float AreaMax, float _velocity)
+    public SwarmOptimization(List<Vector3> AgentStartPositions, int _NumberAgents, float _velocity, float AreaMin, float AreaMax)
     {
-        this.NumberAgents = _NumberAgents;
+        direction = Vector3.zero;
         this.velocity = _velocity;
 
         agentBest = Single.PositiveInfinity;
@@ -36,18 +35,16 @@ public class SwarmOptimization
 
         SwarmBest = Single.PositiveInfinity;
         SwarmBestPosition = CM.RandomPosition(AreaMin, AreaMax);
-
-        direction = Vector3.zero;
     }
 
 
 
-    
+
 
 
     ////////////////////////   SWARM OPTIMIZATION METHODS  ////////////////////////
 
-    // FitnessFunctions: Functions that calculates an agent's fitness -> objective Function
+    // FitnessFunctions: Functions that calculate an agent's fitness -> objective Functions
     public float TestFunction(Vector3 position)
     {
         float fitness = Mathf.Pow(position.x, 2) + Mathf.Pow(position.z, 2) + 1;
@@ -95,8 +92,8 @@ public class SwarmOptimization
     }
 
 
-    // SetBest: Checks each agent's fitness and compares it to both its own previous fitness and the Swarm Best. If current fitness is better than previous one, 
-    //          both the agent's best position and the swarm best position are updated to the current agent position.
+    // SetBest: Checks each agent's fitness and compares it to both its own previous fitness and the Swarm Best. If current fitness is better than both the  
+    //          previous one and the swarm best, the agent's best position and the swarm best position are updated to the current agent position.
     public void SetBest(List<GameObject> listAgents, Func<Vector3, float> FitnessFunction)
     {
         for (int i = 0; i < listAgents.Count; i++)
@@ -104,7 +101,7 @@ public class SwarmOptimization
             Vector3 agentPosition = listAgents[i].transform.position;
             float bestFitnessCandidate = FitnessFunction(agentPosition);
 
-            if (AgentBests[i] > bestFitnessCandidate)   // Verify these conditions for all functions?
+            if (AgentBests[i] > bestFitnessCandidate)
             {
                 AgentBests[i] = bestFitnessCandidate;
                 AgentBestPositions[i] = agentPosition;
@@ -119,15 +116,15 @@ public class SwarmOptimization
     }
 
 
-    // MoveAgents: moves agents while updating the direction for each iteration of the optimization
+    // MoveAgents: Moves agents while updating the direction for each iteration of the optimization
     public void MoveAgents(List<GameObject> listAgents)
     {
         for (int i = 0; i < listAgents.Count; i++)
         {
-            float randomAg = UnityEngine.Random.Range(0f, 1f);
-            float randomSw = UnityEngine.Random.Range(0f, 1f);
+            float randomAgent = UnityEngine.Random.Range(0f, 1f);
+            float randomSwarm = UnityEngine.Random.Range(0f, 1f);
             Vector3 agentPosition = listAgents[i].transform.position;
-            Vector3 newDirection = (W * direction) + (cAg * randomAg) * (AgentBestPositions[i] - agentPosition) + (cSw * randomSw) * (SwarmBestPosition - agentPosition);
+            Vector3 newDirection = (omega * direction) + (phiAgent * randomAgent) * (AgentBestPositions[i] - agentPosition) + (phiSwarm * randomSwarm) * (SwarmBestPosition - agentPosition);
             direction = newDirection;
 
             listAgents[i].transform.Translate(direction.normalized * velocity);

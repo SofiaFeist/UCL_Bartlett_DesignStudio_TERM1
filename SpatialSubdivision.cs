@@ -1,5 +1,4 @@
-﻿using System.Collections;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 using System.Linq;
 
@@ -9,7 +8,8 @@ public class SpatialSubdivision
     float AreaMax;
     int division;
 
-    Dictionary<Vector2Int, List<GameObject>> dictionaryAgents = new Dictionary<Vector2Int, List<GameObject>>();
+    
+
 
     public SpatialSubdivision(float _areaMin, float _areaMax, int _division)
     {
@@ -19,14 +19,8 @@ public class SpatialSubdivision
     }
 
 
-    
-    
-    
-    
-    
 
 
-   
 
 
 
@@ -99,7 +93,7 @@ public class SpatialSubdivision
     }
 
 
-    // UpdateDictionary: Updates dictionary cells as the agents move around
+    // UpdateDictionary: Updates dictionary values as the agents move around
     public void UpdateDictionary(Dictionary<Vector2Int, List<GameObject>> dictionary, Vector2Int currentCell, Vector2Int newCell, GameObject agent)
     {
         if (dictionary.TryGetValue(newCell, out List<GameObject> agentsInCell))

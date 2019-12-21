@@ -2,18 +2,18 @@
 using System.Collections.Generic;
 using UnityEngine;
 using System.Linq;
-using System;
 
 public class MultiAgentSystem : MonoBehaviour
 {
     CommonMethods CM = new CommonMethods();
     SwarmOptimization SO;
 
+
     // Agent Properties
     public GameObject agent;
     Agents agents;
     float velocity = 1.0f;
-    float acceleration = 0.0f;
+    float acceleration = 0.0f;      // NOT IMPLEMENTED
     float minDistance = 1.0f;       // Minimum Distance between Agents: 1.0 = r*2 of a unit Agent
 
     // Seed Properties
@@ -29,10 +29,10 @@ public class MultiAgentSystem : MonoBehaviour
 
     // Environment Properties
     SpatialSubdivision Subdivision = new SpatialSubdivision(AreaMin, AreaMax, division);
-    public static float AreaMin = -50f;
-    public static float AreaMax = 50f;
-    static int division = 50;             // Grid Subdivision: in how many cells is the grid divided into?
-    float AreaInfluence = 3f;            // Area of Influence of each agent: how far they can "see" and react
+    public static float AreaMin = 0f;
+    public static float AreaMax = 100f;
+    public static int division = 20;             // Grid Subdivision: in how many cells is the grid divided into?
+    float AreaInfluence = 3f;                    // Area of Influence of each agent: how far they can "see" and react
     static int NumAgents = 100;
 
 
@@ -40,10 +40,9 @@ public class MultiAgentSystem : MonoBehaviour
     // Lists/Collections
     List<GameObject> listAgents = new List<GameObject>(NumAgents);
     Dictionary<Vector2Int, List<GameObject>> dictionaryAgents = new Dictionary<Vector2Int, List<GameObject>>(NumAgents);
-
-    static List<Vector3> randomStartPositions = new List<Vector3>(NumAgents);
-    //List<Vector3> agentPositions = agentStartPositions.ConvertAll(p => new Vector3(p.x, p.y, p.z));   // I don't think I need this one (delete?)
+    List<Vector3> randomStartPositions = new List<Vector3>(NumAgents);
     List<Vector3> staticAgents = new List<Vector3>(NumAgents + 1) { SeedPosition };
+    
     List<Vector3> steeringForces;
     List<Vector3> imagePixels;
 
@@ -67,13 +66,19 @@ public class MultiAgentSystem : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
-        imagePixels = PointsFromImage(new Vector3(40, 0, 40));
-        NumAgents = imagePixels.Count;
+        // SELF-ASSEMBLY IMAGE POINTS (Uncomment for Self-Assembly Algorithm)
+        //imagePixels = PointsFromImage(new Vector3(20, 0, 20));
+        //NumAgents = imagePixels.Count;
 
-        // INSTANTIATE AGENTS
+
+
+        /////////  OBJECT INSTANTIATIONS  /////////
+
+        // INSTANTIATE AGENTS (with different agent placement methods)
         agents = new Agents(agent, whiteGlowMaterial, NumAgents);
         agents.PlaceAgentsRandomly(AreaMin, AreaMax, minDistance);
-        //agents.PlaceAgentsInRows(new Vector3(-10, 0, 26));
+        //agents.PlaceAgentsInRows(new Vector3(-30, 0, 10));
+
         //agents.PlaceAgentsRandomlyDictionary(AreaMin, AreaMax, minDistance);
         //agents.PlaceAgentsInRowsDictionary(new Vector3(0, 0, 0));
 
@@ -85,7 +90,6 @@ public class MultiAgentSystem : MonoBehaviour
         dictionaryAgents = agents.dictionaryAgents;
 
 
-
         // INSTANTIATE SEED
         //SeedInstance = new Seed(seed, SeedPosition, blueGlowMaterial);
 
@@ -94,10 +98,9 @@ public class MultiAgentSystem : MonoBehaviour
         //LeaderInstance = new Leader(leader, leaderStartPosition, blueGlowMaterial, velocity);
 
 
-        //foreach (var item in PointsFromImage(new Vector3(40, 0, 40)))
-        //{
-        //    Instantiate(agent, item, Quaternion.identity);
-        //}
+
+
+        /////////  COROUTINE METHODS  /////////
 
         // SQUARE MARCH (-> Use with PlaceAgentsInRows)
         //StartCoroutine("SquareMarch");
@@ -110,18 +113,16 @@ public class MultiAgentSystem : MonoBehaviour
         //StartCoroutine("MessagePropagation");
 
 
-
-        // SELF ASSEMBLY ALGORITHM (^ uncomment the imagePixels instantiation at the start of the Start Method)
+        // SELF ASSEMBLY ALGORITHM (^ uncomment the imagePixels instantiation)
         //StartCoroutine("SelfAssemblyOneByOne");
-        //StartCoroutine("SequentialSelfAssembly");
         //StartCoroutine(SequentialAssembly(SeekAssignedPosition));
-
+        //StartCoroutine(SequentialAssembly(SeekClosestPosition));
 
 
         // PARTICLE SWARM OPTIMIZATION
-        //SO = new SwarmOptimization(randomStartPositions, NumAgents, AreaMin, AreaMax, velocity);
-        //StartCoroutine(ParticleSwarmOptimization(200));
-        
+        SO = new SwarmOptimization(randomStartPositions, NumAgents, velocity, AreaMin, AreaMax);
+        StartCoroutine(ParticleSwarmOptimization(200));
+
     }
 
 
@@ -129,6 +130,7 @@ public class MultiAgentSystem : MonoBehaviour
     void FixedUpdate()
     {
         // AGENT WALKING METHODS
+        //LinearWalk(Vector3.right);
         //RandomWalk();
         //RandomWalkNoCollisions();
         //RandomWalkNoCollisionsDictionary();
@@ -138,17 +140,17 @@ public class MultiAgentSystem : MonoBehaviour
 
 
 
-        // AGENT/SEED BEHAVIOURS
+        // AGENT/SEED BEHAVIOURS  (-> Use with SeedInstance)
         //DiffusionLimitedAggregation();
         //Queue();
 
 
 
-        // LEADER WALKING METHODS
+        // LEADER WALKING METHODS  (-> Use with LeaderInstance)
         //LeaderInstance.RandomWalk(listAgents.Select(a => a.transform.position).ToList(), velocity, minDistance, AreaMin, AreaMax);
         //LeaderInstance.EvadeClosestAgent(listAgents.Select(a => a.transform.position).ToList(), velocity, minDistance, AreaMin, AreaMax);
         //LeaderInstance.RandomEvade(listAgents.Select(a => a.transform.position).ToList(), velocity, minDistance, AreaMin, AreaMax);
-        //LeaderInstance.Wander(listAgents.Select(a => a.transform.position).ToList(), velocity, minDistance, AreaMin, AreaMax);
+        //LeaderInstance.Wander(listAgents.Select(a => a.transform.position).ToList(), velocity, AreaInfluence, AreaMin, AreaMax);
 
         // AGENT/LEADER BEHAVIOURS
         //FollowTheLeader();
@@ -156,17 +158,13 @@ public class MultiAgentSystem : MonoBehaviour
 
 
 
-
-
-
-
         // RESET (with Timer)
         //timer += Time.deltaTime;
-        //if (timer < 5)
+        //if (timer < 6)
         //{
         //    RandomWalkNoCollisions();
         //}
-        //Invoke("Reset", 5);   // Time in seconds
+        //Invoke("Reset", 6);   // Time in seconds
     }
 
 
@@ -182,13 +180,13 @@ public class MultiAgentSystem : MonoBehaviour
 
     // Code reference: https://gist.github.com/IranNeto/21542660d740ac02dfce2f6aeb11ebeb#file-pso-py by Iran Neto
 
-    // ParticleSwarmOptimization: Uses particle swarm mouvement to search and find a function minimum 
+    // ParticleSwarmOptimization: Uses particle swarm movement to search and find a function minimum 
     IEnumerator ParticleSwarmOptimization(int NumIterations)
     {
         int iteration = 0;
         while (iteration < NumIterations)
         {
-            SO.SetBest(listAgents, SO.TestFunction);
+            SO.SetBest(listAgents, SO.TestFunction);     // Change Fitness function here.
             SO.MoveAgents(listAgents);
             print(SO.SwarmBestPosition.ToString() + ", " + SO.SwarmBest.ToString());
 
@@ -208,9 +206,14 @@ public class MultiAgentSystem : MonoBehaviour
 
 
     ////////////////////////   DISTRIBUTED SELF-ASSEMBLY ALGORITHM  ////////////////////////  
-    //   =>  Mo agent has the full picture of the whole and have to rely on local sensing/interactions to figure out their positions
 
-    // DistributedSelfAssembly: Agents move one by one to form an image; next agent only starts after the first one reaches its desired position  
+    // DistributedSelfAssembly: No agent has the full picture of the whole and has to rely on local sensing/interactions with surrounding agents to figure out their positions  
+    IEnumerator SeekSensedPosition(GameObject agent, Vector3 seed)
+    {
+        // UNFINISHED...
+        yield return null;
+    }
+
 
 
 
@@ -246,13 +249,13 @@ public class MultiAgentSystem : MonoBehaviour
             Vector3 closestAgent = CM.ClosestAgent(agentPosition, agentPositions);
             Vector3 awayFromAgent = (agentPosition - closestAgent).normalized * velocity;
 
-            if (Vector3.Distance(agentPosition, desiredPosition) <= minDistance)    /// REDUCE VELOCITY
+            if (Vector3.Distance(agentPosition, desiredPosition) <= minDistance)    
             {
                 agent.transform.Translate(desiredPosition - agentPosition);
                 agent.GetComponent<Renderer>().material = blueGlowMaterial;
                 break;
             }
-            else if (!CM.Colliding(AreaInfluence, agentPosition, newPosition, agentPositions) ||
+            else if (!CM.WillCollide(AreaInfluence, agentPosition, newPosition, agentPositions) ||
                      Vector3.Distance(agentPosition, desiredPosition) < AreaInfluence ||
                      !CM.OpposingForces(seekDirection, awayFromAgent))
             {
@@ -268,7 +271,7 @@ public class MultiAgentSystem : MonoBehaviour
 
 
     // SeekClosestPosition: Agents seek the closest position to themselves from the list of positions   -> DOESN'T WORK VERY WELL BECAUSE AGENTS FORM A BARRICADE ON THE OUTLINE OF THE SHAPE
-    IEnumerator SeekClosestPosition(GameObject agent, Vector3 unnecessaryVector)    // TRY USING CLASSES/INTERFACE TO AVOID THIS
+    IEnumerator SeekClosestPosition(GameObject agent, Vector3 unnecessaryVector)    // Try using CLASSES/INTERFACE to avoid this...
     {
         while (true)
         {
@@ -286,7 +289,7 @@ public class MultiAgentSystem : MonoBehaviour
                 imagePixels.Remove(closestImagePoint);
                 break;
             }
-            else if (!CM.Colliding(AreaInfluence, agentPosition, newPosition, agentPositions))
+            else if (!CM.WillCollide(AreaInfluence, agentPosition, newPosition, agentPositions))
             {
                 agent.transform.Translate(seekDirection);
             }
@@ -404,14 +407,14 @@ public class MultiAgentSystem : MonoBehaviour
                     Vector3 newPosition = agentPosition + newDirection;
                     List<Vector3> agentPositions = listAgents.Select(a => a.transform.position).ToList();
 
-                    if (CM.Collides(AreaInfluence, agentPosition, staticAgents))
+                    if (CM.Colliding(AreaInfluence, agentPosition, staticAgents))
                     {
                         listAgents[i].GetComponent<Renderer>().material = blueGlowMaterial;
                         listAgents[i].tag = "Transmitting";
                         staticAgents.Add(agentPosition);
                     }
                     else
-                    if (!CM.Colliding(minDistance, agentPosition, newPosition, agentPositions) &&
+                    if (!CM.WillCollide(minDistance, agentPosition, newPosition, agentPositions) &&   
                         !CM.OutsideBoundaries(newPosition, AreaMin, AreaMax))
                     {
                         listAgents[i].transform.Translate(newDirection);
@@ -433,6 +436,7 @@ public class MultiAgentSystem : MonoBehaviour
 
                         Vector3 correctiveVector = newDirection * repellingForce + perpendicularToAgent * (1 - repellingForce);
                         listAgents[i].transform.Translate(correctiveVector);
+                        steeringForces[i] = correctiveVector;
                     }
                 }
                 if (listAgents[i].tag == "Transmitting")
@@ -469,7 +473,7 @@ public class MultiAgentSystem : MonoBehaviour
 
     ////////////////////////   FOLLOW THE LEADER  ////////////////////////
 
-    //FollowTheLeader: Agents move torwards the Leader
+    //FollowTheLeader: Agents move towards the Leader
     public void FollowTheLeader()
     {
         for (int i = 0; i < listAgents.Count; i++)
@@ -479,8 +483,8 @@ public class MultiAgentSystem : MonoBehaviour
             Vector3 newPosition = agentPosition + pursueLeader;
 
             if (!CM.OutsideBoundaries(newPosition, AreaMin, AreaMax) &&
-                !CM.Colliding(minDistance * 2, agentPosition, newPosition, new List<Vector3> { LeaderInstance.Position }) &&
-                !CM.Colliding(minDistance * 2, agentPosition, newPosition, listAgents.Select(a => a.transform.position).ToList()))
+                !CM.WillCollide(minDistance * 2, agentPosition, newPosition, new List<Vector3> { LeaderInstance.Position }) &&
+                !CM.WillCollide(minDistance * 2, agentPosition, newPosition, listAgents.Select(a => a.transform.position).ToList()))
             {
                 listAgents[i].transform.Translate(pursueLeader);
             }
@@ -501,21 +505,21 @@ public class MultiAgentSystem : MonoBehaviour
             Vector3 avoidLeader = (agentPosition - LeaderInstance.Position).normalized * velocity;
             Vector3 awayFromLeader = agentPosition + avoidLeader;
 
-            if (CM.Colliding(areaInfluence, agentPosition, newRandomPosition, new List<Vector3>() { LeaderInstance.Position }))
+            if (CM.WillCollide(areaInfluence, agentPosition, newRandomPosition, new List<Vector3>() { LeaderInstance.Position }))
             {
                 listAgents[i].GetComponent<Renderer>().material = redGlowMaterial;
                 listAgents[i].transform.Translate(avoidLeader);
             }
             if (!CM.OutsideBoundaries(newRandomPosition, AreaMin, AreaMax) &&
-                !CM.Colliding(minDistance, agentPosition, newRandomPosition, listAgents.Select(a => a.transform.position).ToList()))
+                !CM.WillCollide(minDistance, agentPosition, newRandomPosition, listAgents.Select(a => a.transform.position).ToList()))
             {
                 listAgents[i].GetComponent<Renderer>().material = whiteGlowMaterial;
                 listAgents[i].transform.Translate(randomDirection);
             }
             else
             {
-                Vector3 correctiveVector = randomDirection * 0.2f + CM.BackToBoundaries(agentPosition, randomDirection, velocity, AreaMin, AreaMax) * 0.8f;
-                listAgents[i].transform.Translate(correctiveVector);
+                Vector3 back = avoidLeader * 0.2f + CM.BackToBoundaries(agentPosition, velocity, AreaMin, AreaMax) * 0.8f;
+                listAgents[i].transform.Translate(back);
             }
         }
     }
@@ -527,7 +531,7 @@ public class MultiAgentSystem : MonoBehaviour
 
     ////////////////////////   DIFFUSION LIMITED AGGREGATION ALGORITHM  ////////////////////////
 
-    // DiffusionLimitedAggregation: moves the agents randomly in space until they find the seed or the agents attached to it
+    // DiffusionLimitedAggregation: Moves the agents randomly in space until they find the seed or the agents attached to it
     public void DiffusionLimitedAggregation()
     {
         for (int i = 0; i < listAgents.Count; i++)
@@ -538,7 +542,7 @@ public class MultiAgentSystem : MonoBehaviour
 
             if (listAgents[i].tag == "Moving")
             {
-                if (CM.Collides(minDistance, agentPosition, staticAgents))  
+                if (CM.Colliding(minDistance, agentPosition, staticAgents))  
                 {
                     Vector3 closestStaticAgent = CM.ClosestAgent(agentPosition, staticAgents);
                     float distanceToStaticAgent = Vector3.Distance(agentPosition, closestStaticAgent);
@@ -551,7 +555,7 @@ public class MultiAgentSystem : MonoBehaviour
                     staticAgents.Add(agentPosition);
                 }
                 else
-                if (!CM.Colliding(minDistance, agentPosition, newPosition, listAgents.Where(a => a.tag == "Moving").Select(a => a.transform.position).ToList()) &&
+                if (!CM.WillCollide(minDistance, agentPosition, newPosition, listAgents.Where(a => a.tag == "Moving").Select(a => a.transform.position).ToList()) &&
                     !CM.OutsideBoundaries(newPosition, AreaMin, AreaMax))               
                 {
                     listAgents[i].transform.Translate(newDirection);
@@ -572,7 +576,7 @@ public class MultiAgentSystem : MonoBehaviour
 
             if (listAgents[i].tag == "Moving")
             {
-                if (CM.Collides(minDistance * 2, agentPosition, staticAgents))            // CHECK: Something is not okay with these calculations
+                if (CM.WillCollide(minDistance, agentPosition, newPosition, staticAgents))        
                 {
                     float distanceToStaticAgent = Vector3.Distance(agentPosition, staticAgents[0]);
                     Vector3 moveCloserToStaticAgent = (staticAgents[0] - agentPosition).normalized * velocity;
@@ -584,7 +588,7 @@ public class MultiAgentSystem : MonoBehaviour
                     staticAgents[0] = agentPosition;
                 }
                 else
-                if (!CM.Colliding(minDistance, agentPosition, newPosition, listAgents.Select(a => a.transform.position).ToList()) &&
+                if (!CM.WillCollide(minDistance, agentPosition, newPosition, listAgents.Select(a => a.transform.position).ToList()) &&
                     !CM.OutsideBoundaries(newPosition, AreaMin, AreaMax))                  
                 {
                     listAgents[i].transform.Translate(newDirection);
@@ -602,7 +606,7 @@ public class MultiAgentSystem : MonoBehaviour
 
     ////////////////////////   RESET  ////////////////////////
 
-    // Reset: moves the agents back to their Start Position 
+    // Reset: Moves the agents back to their Start Positions 
     public void Reset()
     {
         for (int i = 0; i < listAgents.Count; i++)
@@ -631,7 +635,6 @@ public class MultiAgentSystem : MonoBehaviour
 
 
 
-
     ////////////////////////////   WANDERING BEHAVIOUR  ////////////////////////////
 
     // Wander: Smooth form of random walk; small random displacements in the trajectory but no abrupt turns
@@ -644,7 +647,7 @@ public class MultiAgentSystem : MonoBehaviour
             //Vector3 newDirection = CM.PerlinVector(steeringForces[i], agentPosition, velocity);             // Two different implementation approaches for the same result
             Vector3 newPosition = agentPosition + newDirection;
 
-            if (!CM.Colliding(AreaInfluence, agentPosition, newPosition, listAgents.Select(a => a.transform.position).ToList()) &&
+            if (!CM.Colliding(AreaInfluence, agentPosition, listAgents.Select(a => a.transform.position).ToList()) &&
                 !CM.OutsideBoundaries(newPosition, AreaMin, AreaMax))
             {
                 listAgents[i].transform.Translate(newDirection);
@@ -676,6 +679,7 @@ public class MultiAgentSystem : MonoBehaviour
 
                 Vector3 correctiveVector = newDirection * repellingForce + perpendicularToAgent * (1 - repellingForce);
                 listAgents[i].transform.Translate(correctiveVector);
+                steeringForces[i] = correctiveVector;
             }
         }
     }
@@ -729,7 +733,7 @@ public class MultiAgentSystem : MonoBehaviour
     }
 
 
-    // LinearWalk: agents walk linearly in one direction
+    // LinearWalk: Agents walk linearly in a given direction
     public void LinearWalk(Vector3 direction)
     {
         for (int i = 0; i < listAgents.Count; i++)
@@ -746,7 +750,7 @@ public class MultiAgentSystem : MonoBehaviour
 
     ////////////////////////////   RANDOM WALK  ////////////////////////////
 
-    // MoveAgentsRandomly: moves the agents randomly in space with no regards for their surroundings
+    // RandomWalk: Moves the agents randomly in space with no regards for their surroundings
     public void RandomWalk()
     {
         foreach (GameObject agent in listAgents)
@@ -762,7 +766,7 @@ public class MultiAgentSystem : MonoBehaviour
     }
 
 
-    // MoveAgentsNoColisions: moves the agents randomly in space while trying to avoid intersecting other agents
+    // MoveAgentsNoColisions: Moves the agents randomly in space while avoiding collisions
     public void RandomWalkNoCollisions()
     {
         for (int i = 0; i < listAgents.Count; i++)
@@ -771,13 +775,13 @@ public class MultiAgentSystem : MonoBehaviour
             Vector3 agentPosition = listAgents[i].transform.position;
             Vector3 newPosition = agentPosition + newDirection;
 
-            if (!CM.Colliding(minDistance, agentPosition, newPosition, listAgents.Select(a => a.transform.position).ToList()) &&
+            if (!CM.WillCollide(minDistance, agentPosition, newPosition, listAgents.Select(a => a.transform.position).ToList()) &&
                 !CM.OutsideBoundaries(newPosition, AreaMin, AreaMax))
             {
                 listAgents[i].GetComponent<Renderer>().material = whiteGlowMaterial;
                 listAgents[i].transform.Translate(newDirection);
             }
-            else if (CM.Colliding(minDistance, agentPosition, newPosition, listAgents.Select(a => a.transform.position).ToList()))
+            else if (CM.WillCollide(minDistance, agentPosition, newPosition, listAgents.Select(a => a.transform.position).ToList()))
             {
                 listAgents[i].GetComponent<Renderer>().material = redGlowMaterial;
             }
@@ -785,7 +789,7 @@ public class MultiAgentSystem : MonoBehaviour
     }
 
 
-    // RandomWalkNoCollisionsDictionary: Same but with a dictionary for spatial subdivision  ->  Doesn't work very well... Code is slower...
+    // RandomWalkNoCollisionsDictionary: Same but with a dictionary for spatial subdivision  ->  SOMETHING IS WRONG WITH THIS ONE...
     public void RandomWalkNoCollisionsDictionary()
     {
         foreach (var cell in dictionaryAgents.Keys.ToList())
@@ -799,7 +803,7 @@ public class MultiAgentSystem : MonoBehaviour
                 Vector2Int newCell = Subdivision.GridLocation(newPosition);
                 List<Vector2Int> neighbouringCells = Subdivision.ClosestCells(newPosition, newCell, AreaInfluence);
 
-                if (!CM.Colliding(dictionaryAgents, minDistance, agentPosition, newPosition, neighbouringCells) &&
+                if (!CM.WillCollide(dictionaryAgents, minDistance, agentPosition, newPosition, neighbouringCells) &&
                     !CM.OutsideBoundaries(newPosition, AreaMin, AreaMax))
                 {
                     agent.GetComponent<Renderer>().material = whiteGlowMaterial;
@@ -812,10 +816,7 @@ public class MultiAgentSystem : MonoBehaviour
                 {
                     agent.GetComponent<Renderer>().material = redGlowMaterial;
                 }
-
             }
-
         }
-        print(dictionaryAgents.Count);
     }
 }
